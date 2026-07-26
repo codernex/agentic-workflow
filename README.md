@@ -1,159 +1,164 @@
-# Turborepo starter
+# Agentic Workflow Automation Engine 🚀
 
-This Turborepo starter is maintained by the Turborepo core team.
+> **Next-Gen Event-Driven AI Agent DAG Execution Platform**  
+> Powered by Hugging Face `smolagents`, Isolated Python Subprocess Sandboxing, Mailtrap Email Verification, and Real-Time WebSocket Execution Streaming.
 
-## Using this example
+---
 
-Run the following command:
+## 🌟 Overview
 
-```sh
-npx create-turbo@latest
+The **Agentic Workflow Automation Engine** is a modern, full-stack monorepo platform designed to visually orchestrate autonomous AI agents, isolated Python execution sandboxes, event webhooks, and third-party integrations into directed acyclic graphs (DAGs).
+
+---
+
+## ✨ Key Features
+
+- 🎨 **Visual DAG Canvas Studio**: Interactive node-based graph editor built with ReactFlow, featuring a collapsible nodes collection sidebar, 1-click custom tool builder, and live thought trace execution drawers.
+- 🤖 **Hugging Face `smolagents` Reasoning**: Autonomous `CodeAgent` execution powered by OpenRouter / OpenAI models with dynamic template interpolation (e.g. `{node-1.data}`, `{source}`).
+- 🔒 **Isolated Python Subprocess Sandbox**: Executes custom Python code snippets inside separate `multiprocessing.Process` workers with a restricted builtins whitelist and strict **5.0s execution timeout** limits.
+- 🔀 **Selective Data Forwarding**: Per-node field projection control (`all` or `selected_keys`) allowing users to choose exact payload keys passed to downstream nodes.
+- 📧 **User Authentication & Mailtrap Verification**: 6-digit email verification code delivery powered by the **Official Mailtrap Python SDK** with elegant responsive HTML email templates, JWT security, and a resend code facility.
+- ⚡ **Event-Driven Webhook Ingestion**: Dedicated webhook trigger endpoints (`POST /api/v1/workflows/webhooks/{workflow_id}`) with raw JSON payload inspection.
+- 🛡️ **GDPR Article 17 & 20 Compliance**: Native 1-click data portability export (downloadable `gdpr_export_<user_id>.json` archive) and permanent account erasure rights ("Right to be Forgotten").
+- 🚀 **SEO & Social Sharing Support**: Built with Next.js 16 dynamic metadata, OpenGraph cards, Twitter preview cards, and JSON-LD `SoftwareApplication` structured schemas.
+
+---
+
+## 🛠️ Technology Stack
+
+### Frontend (`apps/web`)
+- **Framework**: Next.js 16 (App Router, Turbopack) & React 19
+- **Styling**: TailwindCSS with custom Glassmorphism aesthetic tokens
+- **Graph Editor**: `@xyflow/react` (ReactFlow v12)
+- **State & Data Fetching**: TanStack React Query v5 & `@repo/api-client`
+- **Icons & UI Components**: Lucide React, Radix UI, Shadcn UI
+
+### Backend Engine (`apps/engine`)
+- **Framework**: FastAPI (Python 3.14)
+- **Database & ORM**: PostgreSQL via SQLModel & AsyncPG
+- **Migrations**: Alembic
+- **AI Agent Framework**: Hugging Face `smolagents` (`CodeAgent`, `OpenAIServerModel`)
+- **Email Delivery**: Official `mailtrap` Python SDK
+- **Security**: Direct `bcrypt` password hashing, `python-jose` JWT tokens
+
+---
+
+## 📁 Repository Structure
+
+```text
+agentic-workflow/
+├── apps/
+│   ├── engine/                # FastAPI Engine (Python 3.14)
+│   │   ├── alembic/           # Database schema migrations
+│   │   ├── src/
+│   │   │   ├── api/v1/        # Auth, Workflows, Executions, GDPR, Webhooks APIs
+│   │   │   ├── auth/          # Password hashing & JWT dependencies
+│   │   │   ├── engine/        # smolagents agent runner & isolated sandbox.py
+│   │   │   ├── models/        # SQLModel entities (User, Workflow, Execution, Tool)
+│   │   │   └── services/      # Mailtrap email verification service
+│   │   └── tests/             # Pytest suite (pytest 9/9 passed)
+│   └── web/                   # Next.js 16 Web Application
+│       ├── app/               # Public Landing Page, Dashboard, Login, Workflows
+│       ├── components/        # CanvasEditor, CustomCanvasNode, GDPR & Onboarding
+│       ├── context/           # AuthContext & useAuth hook
+│       └── lib/               # API client setup
+├── packages/
+│   └── api-client/            # Auto-generated OpenAPI TypeScript client (@repo/api-client)
+├── turbo.json                 # Turborepo configuration
+└── pnpm-workspace.yaml        # Monorepo workspace configuration
 ```
 
-## What's inside?
+---
 
-This Turborepo includes the following packages/apps:
+## 🚀 Getting Started
 
-### Apps and Packages
+### Prerequisites
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- **Node.js** >= 18 & **pnpm** >= 9.0
+- **Python** >= 3.14 & **uv** package manager
+- **PostgreSQL** running locally on port `5432`
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+---
 
-### Utilities
+### 1. Installation
 
-This Turborepo has some additional tools already setup for you:
+Clone the repository and install frontend dependencies:
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```bash
+pnpm install
 ```
 
-Without global `turbo`, use your package manager:
+Set up the Python backend environment in `apps/engine`:
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+```bash
+cd apps/engine
+uv sync
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+---
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+### 2. Database Migrations
 
-```sh
-turbo build --filter=docs
+Ensure your PostgreSQL database `workflow` exists, then run Alembic migrations:
+
+```bash
+cd apps/engine
+.venv/bin/alembic upgrade head
 ```
 
-Without global `turbo`:
+---
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+### 3. Generate OpenAPI TypeScript Client
+
+```bash
+pnpm --filter @repo/api-client build
 ```
 
-### Develop
+---
 
-To develop all apps and packages, run the following command:
+### 4. Running Locally
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Start both the Next.js frontend (`http://localhost:3000`) and Python FastAPI engine (`http://localhost:8000`) simultaneously:
 
-```sh
-cd my-turborepo
-turbo dev
+```bash
+pnpm dev
 ```
 
-Without global `turbo`, use your package manager:
+---
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
+## 🧪 Testing & Builds
+
+### Run Backend Test Suite
+
+```bash
+cd apps/engine
+.venv/bin/pytest
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+### Build Production Web App
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
+```bash
+pnpm --filter web run build
 ```
 
-Without global `turbo`:
+---
 
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
+## 🔗 Key API Routes (`/api/v1`)
 
-### Remote Caching
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| **`/api/v1/auth/register`** | `POST` | Registers a new user and sends Mailtrap 6-digit email verification code. |
+| **`/api/v1/auth/verify-email`** | `POST` | Validates 6-digit email verification code. |
+| **`/api/v1/auth/resend-code`** | `POST` | Resends a new 6-digit verification code via Mailtrap. |
+| **`/api/v1/auth/login`** | `POST` | Authenticates user and returns JWT access token. |
+| **`/api/v1/workflows`** | `GET / POST` | User-scoped workflow management. |
+| **`/api/v1/workflows/{id}/execute`** | `POST` | Launches manual workflow DAG execution. |
+| **`/api/v1/workflows/webhooks/{id}`** | `POST` | Triggers workflow via external HTTP POST webhook. |
+| **`/api/v1/gdpr/export`** | `GET` | Machine-readable JSON export (Article 20). |
+| **`/api/v1/gdpr/account`** | `DELETE` | Permanent account & workflow data erasure (Article 17). |
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+---
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+## 📄 License
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+MIT License &copy; Agentic Workflow Platform. All rights reserved.

@@ -1,0 +1,1095 @@
+"use client";
+
+import React, { useState, useCallback, useEffect } from "react";
+import {
+  ReactFlow,
+  Controls,
+  Background,
+  applyNodeChanges,
+  applyEdgeChanges,
+  addEdge,
+  Node,
+  Edge,
+  OnNodesChange,
+  OnEdgesChange,
+  OnConnect,
+  BackgroundVariant,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+
+import { Play, Save, Plus, Zap, Bot, Code, Globe, GitFork, Terminal, RefreshCw, X, Check, Trash2, Copy, Clock, Layers, Wrench, Sparkles, ChevronLeft, ChevronRight, Search, Loader2, CheckCircle2, Database, Mail, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  listWorkflowsApiV1WorkflowsGetQueryKey,
+  getWorkflowApiV1WorkflowsWorkflowIdGetQueryKey,
+  listCustomToolsApiV1ToolsCustomGetOptions,
+  listCustomToolsApiV1ToolsCustomGetQueryKey,
+  createCustomToolApiV1ToolsCustomPostMutation,
+  listExecutionsApiV1ExecutionsGetOptions,
+  getExecutionStepLogsApiV1ExecutionsRunIdLogsGetOptions,
+} from "@repo/api-client";
+import { CustomCanvasNode } from "./CustomCanvasNode";
+import { ENGINE_BASE_URL, ENGINE_WS_URL } from "@/lib/api";
+
+const nodeTypes = {
+  customNode: CustomCanvasNode,
+};
+
+interface CanvasEditorProps {
+  workflowId: string;
+  initialNodes?: Node[];
+  initialEdges?: Edge[];
+  workflowName?: string;
+}
+
+export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [], workflowName = "New Workflow" }: CanvasEditorProps) {
+  const queryClient = useQueryClient();
+  const [nodes, setNodes] = useState<Node[]>(
+    initialNodes.length > 0
+      ? initialNodes
+      : [
+          {
+            id: "node-1",
+            type: "customNode",
+            position: { x: 250, y: 100 },
+            data: { label: "Manual Trigger", type: "trigger" },
+          },
+          {
+            id: "node-2",
+            type: "customNode",
+            position: { x: 250, y: 300 },
+            data: { label: "Reasoning Agent", type: "agent", prompt: "Summarize context inputs and extract key action points." },
+          },
+        ]
+  );
+
+  const [edges, setEdges] = useState<Edge[]>(
+    initialEdges.length > 0
+      ? initialEdges
+      : [
+          { id: "edge-1-2", source: "node-1", target: "node-2", animated: true, style: { stroke: "#8b5cf6", strokeWidth: 2 } },
+        ]
+  );
+
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  const [isLogsOpen, setIsLogsOpen] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [stepLogs, setStepLogs] = useState<any[]>([]);
+
+  // Node Palette Sidebar & Custom Tool State
+  const [isPaletteOpen, setIsPaletteOpen] = useState(true);
+  const [isCustomToolModalOpen, setIsCustomToolModalOpen] = useState(false);
+  const [paletteSearch, setPaletteSearch] = useState("");
+
+  // Saving & Toast Notification State
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Fetch execution runs for this workflow
+  const { data: executionRuns = [], refetch: refetchExecutions } = useQuery({
+    ...listExecutionsApiV1ExecutionsGetOptions({ query: { workflow_id: workflowId } }),
+    enabled: isLogsOpen,
+  });
+
+  // Fetch step logs for selected active run
+  const { data: activeStepLogs = [], refetch: refetchStepLogs } = useQuery({
+    ...getExecutionStepLogsApiV1ExecutionsRunIdLogsGetOptions({
+      path: { run_id: activeRunId || "" },
+    }),
+    enabled: !!activeRunId && isLogsOpen,
+  });
+
+  useEffect(() => {
+    if (isLogsOpen && (executionRuns as any[]).length > 0 && !activeRunId) {
+      setActiveRunId((executionRuns[0] as any).id);
+    }
+  }, [isLogsOpen, executionRuns, activeRunId]);
+
+  const selectedRunData = (executionRuns as any[]).find((r) => r.id === activeRunId) || ((executionRuns as any[])[0] || null);
+
+  const [customToolName, setCustomToolName] = useState("");
+  const [customToolDesc, setCustomToolDesc] = useState("");
+  const [customToolType, setCustomToolType] = useState<"python_code" | "http_api">("python_code");
+  const [customToolCodeOrUrl, setCustomToolCodeOrUrl] = useState("output = {'result': inputs}");
+
+  // Fetch custom tools via React Query
+  const { data: customTools = [] } = useQuery(
+    listCustomToolsApiV1ToolsCustomGetOptions()
+  );
+
+  // Mutation for creating custom tool
+  const createCustomToolMutation = useMutation({
+    ...createCustomToolApiV1ToolsCustomPostMutation(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: listCustomToolsApiV1ToolsCustomGetQueryKey() });
+      setIsCustomToolModalOpen(false);
+      setCustomToolName("");
+      setCustomToolDesc("");
+      setCustomToolCodeOrUrl("output = {'result': inputs}");
+    },
+  });
+
+  const handleCreateCustomTool = () => {
+    if (!customToolName.trim() || !customToolCodeOrUrl.trim()) return;
+    createCustomToolMutation.mutate({
+      body: {
+        name: customToolName,
+        description: customToolDesc || "Custom node tool.",
+        tool_type: customToolType as any,
+        code_or_url: customToolCodeOrUrl,
+        input_schema: {},
+        output_schema: {},
+      },
+    });
+  };
+
+  const handleAddCustomToolNodeToCanvas = (tool: any) => {
+    const isCode = tool.tool_type === "python_code";
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: "customNode",
+      position: { x: 300 + nodes.length * 30, y: 150 + nodes.length * 30 },
+      data: {
+        label: tool.name,
+        type: isCode ? "code" : "http_request",
+        code: isCode ? tool.code_or_url : undefined,
+        url: !isCode ? tool.code_or_url : undefined,
+      },
+    };
+    setNodes((nds) => [...nds, newNode]);
+  };
+
+  const PRESET_COLLECTION = [
+    {
+      category: "Triggers & Events",
+      items: [
+        { type: "trigger", trigger_type: "manual", label: "Manual API Trigger", desc: "On-demand or POST payload entry.", icon: Zap, color: "text-purple-400" },
+        { type: "trigger", trigger_type: "webhook", label: "Inbound Webhook", desc: "Listens for third-party HTTP POST webhooks.", icon: Zap, color: "text-purple-400" },
+        { type: "trigger", trigger_type: "cron", label: "Cron Scheduler", cron_expression: "0 * * * *", desc: "Periodic UTC time-based execution.", icon: Clock, color: "text-purple-400" },
+      ],
+    },
+    {
+      category: "AI Reasoning Agents",
+      items: [
+        { type: "agent", label: "smolagent Code Agent", prompt: "Analyze inputs and execute decision logic.", desc: "Dynamic Thought -> Action loop.", icon: Bot, color: "text-pink-400" },
+        { type: "agent", label: "Content Summarizer", prompt: "Summarize upstream input data into executive bullet points.", desc: "Extracts key insights from text.", icon: Bot, color: "text-pink-400" },
+        { type: "agent", label: "Lead Scoring Agent", prompt: "Analyze user lead payload and score priority (1-100).", desc: "Scores and classifies incoming leads.", icon: Bot, color: "text-pink-400" },
+      ],
+    },
+    {
+      category: "Logic & Code",
+      items: [
+        { type: "code", label: "Python Code Block", code: "output = {'processed': inputs}", desc: "Inline Python execution with inputs dict.", icon: Code, color: "text-blue-400" },
+        { type: "condition", label: "Conditional Router", desc: "Evaluates if/else conditions on inputs.", icon: GitFork, color: "text-amber-400" },
+        { type: "filter", label: "Data Filter & Mapper", desc: "Transforms and filters nested JSON values.", icon: Filter, color: "text-purple-400" },
+      ],
+    },
+    {
+      category: "Integrations & Alerts",
+      items: [
+        { type: "http_request", label: "HTTP REST API", url: "https://api.github.com/zen", method: "GET", desc: "REST HTTP call (GET/POST/PUT/DELETE).", icon: Globe, color: "text-emerald-400" },
+        { type: "database", label: "Database Ingestion", desc: "Queries or writes data to database store.", icon: Database, color: "text-sky-400" },
+        { type: "email", label: "Email Alert Notification", desc: "Dispatches email alert via webhook/SMTP.", icon: Mail, color: "text-rose-400" },
+      ],
+    },
+  ];
+
+  // Node Changes
+  const onNodesChange: OnNodesChange = useCallback(
+    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    []
+  );
+
+  // Edge Changes
+  const onEdgesChange: OnEdgesChange = useCallback(
+    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    []
+  );
+
+  // Handle Connections
+  const onConnect: OnConnect = useCallback(
+    (connection) =>
+      setEdges((eds) =>
+        addEdge(
+          { ...connection, animated: true, style: { stroke: "#8b5cf6", strokeWidth: 2 } },
+          eds
+        )
+      ),
+    []
+  );
+
+  // On Node Click -> Open Inspector Sheet
+  const onNodeClick = (_: React.MouseEvent, node: Node) => {
+    setSelectedNode(node);
+    setIsInspectorOpen(true);
+  };
+
+  // Add Node Handler
+  const handleAddNode = (type: string, label: string) => {
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: "customNode",
+      position: { x: 250 + nodes.length * 40, y: 150 + nodes.length * 40 },
+      data: {
+        label,
+        type,
+        prompt: type === "agent" ? "Analyze inputs and execute decision logic." : undefined,
+        code: type === "code" ? "output = {'result': inputs}" : undefined,
+        url: type === "http_request" ? "https://api.github.com/zen" : undefined,
+      },
+    };
+    setNodes((nds) => [...nds, newNode]);
+  };
+
+  // Update Node Configuration from Inspector
+  const updateSelectedNodeData = (key: string, value: any) => {
+    if (!selectedNode) return;
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id === selectedNode.id) {
+          const updated = { ...n, data: { ...n.data, [key]: value } };
+          setSelectedNode(updated);
+          return updated;
+        }
+        return n;
+      })
+    );
+  };
+
+  // Delete Selected Node Handler
+  const handleDeleteNode = (nodeId: string) => {
+    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+    setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
+    setIsInspectorOpen(false);
+    setSelectedNode(null);
+  };
+
+  // Get parent nodes connected to selected node
+  const getParentNodesForSelected = () => {
+    if (!selectedNode) return [];
+    const parentEdgeSources = edges.filter((e) => e.target === selectedNode.id).map((e) => e.source);
+    return nodes.filter((n) => parentEdgeSources.includes(n.id));
+  };
+
+  // Replace / Change Node Type Handler
+  const handleReplaceNodeType = (newType: string) => {
+    if (!selectedNode) return;
+    const defaultLabels: Record<string, string> = {
+      trigger: "Event Trigger",
+      agent: "smolagent AI",
+      code: "Python Code",
+      http_request: "HTTP Request",
+      condition: "Condition Node",
+    };
+
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id === selectedNode.id) {
+          const updated = {
+            ...n,
+            data: {
+              ...n.data,
+              type: newType,
+              label: defaultLabels[newType] || newType,
+              prompt: newType === "agent" ? (n.data.prompt || "Analyze inputs and execute decision logic.") : n.data.prompt,
+              code: newType === "code" ? (n.data.code || "output = {'result': inputs}") : n.data.code,
+              url: newType === "http_request" ? (n.data.url || "https://api.github.com/zen") : n.data.url,
+              trigger_type: newType === "trigger" ? (n.data.trigger_type || "manual") : n.data.trigger_type,
+            },
+          };
+          setSelectedNode(updated);
+          return updated;
+        }
+        return n;
+      })
+    );
+  };
+
+  // Save Workflow to Backend API
+  const handleSaveWorkflow = async () => {
+    setIsSaving(true);
+    setSaveSuccess(false);
+    try {
+      const response = await fetch(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: workflowName,
+          nodes: nodes,
+          edges: edges,
+        }),
+      });
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: listWorkflowsApiV1WorkflowsGetQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getWorkflowApiV1WorkflowsWorkflowIdGetQueryKey({ path: { workflow_id: workflowId } }) });
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2500);
+      }
+    } catch (e) {
+      console.error("Failed to save workflow:", e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Run Workflow Execution & Connect WebSocket
+  const handleRunWorkflow = async () => {
+    setIsRunning(true);
+    setIsLogsOpen(true);
+    setStepLogs([]);
+
+    try {
+      // First save workflow graph
+      await fetch(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: workflowName, nodes, edges }),
+      });
+
+      // Trigger Execution
+      const res = await fetch(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trigger_time: new Date().toISOString() }),
+      });
+      const runData = await res.json();
+      setActiveRunId(runData.id);
+
+      // Listen via WebSocket for real-time thoughts & updates
+      const ws = new WebSocket(`${ENGINE_WS_URL}/api/v1/ws/executions/${runData.id}`);
+
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.event === "step_start" || payload.event === "step_completed" || payload.event === "step_failed") {
+            setStepLogs((prev) => [...prev, payload]);
+            refetchStepLogs();
+          } else if (payload.event === "run_completed" || payload.event === "run_failed") {
+            setIsRunning(false);
+            ws.close();
+            refetchExecutions();
+            refetchStepLogs();
+          }
+        } catch (e) {
+          console.error("Error parsing ws message:", e);
+        }
+      };
+
+      ws.onerror = () => {
+        setIsRunning(false);
+      };
+    } catch (e) {
+      console.error("Execution failed:", e);
+      setIsRunning(false);
+    }
+  };
+
+  return (
+    <div className="relative h-[calc(100vh-4rem)] w-full overflow-hidden bg-background flex">
+      {/* Collapsible Left Nodes Collection Sidebar */}
+      {isPaletteOpen && (
+        <div className="w-80 border-r bg-background/95 backdrop-blur-xl flex flex-col z-20 shadow-2xl shrink-0 h-full overflow-hidden">
+          <div className="p-4 border-b flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-purple-400" />
+              <h3 className="font-bold text-sm">Nodes Collection</h3>
+            </div>
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setIsPaletteOpen(false)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="p-3 border-b space-y-2 bg-muted/20 shrink-0">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search nodes & custom tools..."
+                className="pl-8 h-8 text-xs bg-background"
+                value={paletteSearch}
+                onChange={(e) => setPaletteSearch(e.target.value)}
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setIsCustomToolModalOpen(true)}
+              className="w-full gap-1.5 text-xs bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-sm"
+            >
+              <Plus className="h-3.5 w-3.5" /> Create Custom Node
+            </Button>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-6">
+            {/* Built-in Node Categories */}
+            {PRESET_COLLECTION.map((cat, idx) => {
+              const filteredItems = cat.items.filter(
+                (item) =>
+                  item.label.toLowerCase().includes(paletteSearch.toLowerCase()) ||
+                  item.desc.toLowerCase().includes(paletteSearch.toLowerCase())
+              );
+              if (filteredItems.length === 0) return null;
+              return (
+                <div key={idx} className="space-y-2 mb-4">
+                  <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider font-mono px-1">
+                    {cat.category}
+                  </h4>
+                  <div className="space-y-1.5">
+                    {filteredItems.map((item, iIdx) => {
+                      const IconComponent = item.icon;
+                      return (
+                        <div
+                          key={iIdx}
+                          onClick={() => handleAddNode(item.type, item.label)}
+                          className="group p-2.5 rounded-xl border border-border/40 hover:border-purple-500/50 bg-card/40 hover:bg-purple-500/10 cursor-pointer transition-all flex items-start gap-2.5 shadow-sm"
+                        >
+                          <div className={`p-2 rounded-lg bg-secondary/80 mt-0.5 ${item.color}`}>
+                            <IconComponent className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <h5 className="text-xs font-semibold group-hover:text-purple-300 transition-colors">
+                                {item.label}
+                              </h5>
+                              <Plus className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-purple-400 transition-opacity" />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">
+                              {item.desc}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Custom Tools Section */}
+            <div className="space-y-2 pt-2 border-t">
+              <div className="flex items-center justify-between px-1">
+                <h4 className="text-[11px] font-bold text-purple-400 uppercase tracking-wider font-mono flex items-center gap-1">
+                  <Wrench className="h-3.5 w-3.5" /> Custom Tools ({ (customTools as any[]).length })
+                </h4>
+              </div>
+
+              {(customTools as any[]).length === 0 ? (
+                <p className="text-[11px] text-muted-foreground italic px-1">No custom nodes created yet. Click '+ Create Custom Node' above.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {(customTools as any[]).filter(t => t.name.toLowerCase().includes(paletteSearch.toLowerCase())).map((tool: any) => (
+                    <div
+                      key={tool.id}
+                      onClick={() => handleAddCustomToolNodeToCanvas(tool)}
+                      className="group p-2.5 rounded-xl border border-purple-500/20 hover:border-purple-500/60 bg-purple-950/20 hover:bg-purple-900/30 cursor-pointer transition-all flex items-start gap-2.5 shadow-sm"
+                    >
+                      <div className="p-2 rounded-lg bg-purple-500/20 text-purple-300 mt-0.5">
+                        <Wrench className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-xs font-semibold text-purple-200 group-hover:text-white">
+                            {tool.name}
+                          </h5>
+                          <Plus className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-purple-300 transition-opacity" />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">
+                          {tool.description}
+                        </p>
+                        <Badge variant="outline" className="text-[9px] uppercase font-mono mt-1 text-purple-300 border-purple-500/30">
+                          {tool.tool_type}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="relative flex-1 h-full overflow-hidden">
+      {/* Top Floating Control Bar */}
+      <div className="absolute top-4 left-6 right-6 z-10 flex items-center justify-between pointer-events-none">
+        {/* Toggle Sidebar & Quick Node Palette */}
+        <div className="pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-xl border bg-background/90 backdrop-blur-md shadow-2xl">
+          <Button
+            size="sm"
+            variant={isPaletteOpen ? "secondary" : "outline"}
+            onClick={() => setIsPaletteOpen(!isPaletteOpen)}
+            className="gap-1.5 text-xs"
+          >
+            <Layers className="h-3.5 w-3.5 text-purple-400" />
+            {isPaletteOpen ? "Hide Palette" : "Show Palette"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleAddNode("trigger", "Event Trigger")}
+            className="gap-1.5 text-xs hover:bg-purple-500/10 hover:text-purple-400"
+          >
+            <Zap className="h-3.5 w-3.5 text-purple-400" /> + Trigger
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleAddNode("agent", "smolagent AI")}
+            className="gap-1.5 text-xs hover:bg-pink-500/10 hover:text-pink-400"
+          >
+            <Bot className="h-3.5 w-3.5 text-pink-400" /> + AI Agent
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleAddNode("code", "Python Code")}
+            className="gap-1.5 text-xs hover:bg-blue-500/10 hover:text-blue-400"
+          >
+            <Code className="h-3.5 w-3.5 text-blue-400" /> + Code
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => handleAddNode("http_request", "HTTP Request")}
+            className="gap-1.5 text-xs hover:bg-emerald-500/10 hover:text-emerald-400"
+          >
+            <Globe className="h-3.5 w-3.5 text-emerald-400" /> + HTTP
+          </Button>
+        </div>
+
+        {/* Action Controls */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setIsLogsOpen(!isLogsOpen)} className="gap-2">
+            <Terminal className="h-4 w-4 text-purple-400" /> Execution Logs
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleSaveWorkflow}
+            disabled={isSaving}
+            className="gap-2 font-medium transition-all"
+          >
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+            ) : saveSuccess ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {isSaving ? "Saving..." : saveSuccess ? "Saved!" : "Save"}
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleRunWorkflow}
+            disabled={isRunning}
+            className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/20"
+          >
+            {isRunning ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />}
+            {isRunning ? "Running..." : "Test Execute"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Floating Save Toast Banner */}
+      {saveSuccess && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-500/30 bg-emerald-950/80 backdrop-blur-xl text-emerald-300 text-xs font-semibold shadow-2xl animate-in fade-in-0 slide-in-from-top-4 duration-200">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Workflow graph saved successfully!
+        </div>
+      )}
+
+      {/* Main Visual ReactFlow Canvas */}
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={onNodeClick}
+        nodeTypes={nodeTypes}
+        fitView
+        className="bg-background"
+      >
+        <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="rgba(255, 255, 255, 0.08)" />
+        <Controls className="!bg-background/80 !border-border !shadow-lg rounded-xl" />
+      </ReactFlow>
+
+      {/* Node Inspector Sidebar Sheet */}
+      <Sheet open={isInspectorOpen} onOpenChange={setIsInspectorOpen}>
+        <SheetContent className="w-[420px] sm:w-[540px] bg-background/95 backdrop-blur-xl border-l">
+          <SheetHeader className="pb-4 border-b">
+            <SheetTitle className="flex items-center gap-2 text-lg font-bold">
+              Configure Node
+            </SheetTitle>
+            <SheetDescription>
+              Edit parameters, prompts, and execution code for this node.
+            </SheetDescription>
+          </SheetHeader>
+
+          {selectedNode && (
+            <div className="py-6 space-y-6">
+              {/* Node Title */}
+              <div className="space-y-2">
+                <Label>Node Label</Label>
+                <Input
+                  value={selectedNode.data.label as string}
+                  onChange={(e) => updateSelectedNodeData("label", e.target.value)}
+                />
+              </div>
+
+              {/* Node Type Selector (Replace Node) */}
+              <div className="space-y-2">
+                <Label>Node Type (Replace Node)</Label>
+                <Select
+                  value={(selectedNode.data.type as string) || "agent"}
+                  onValueChange={(val) => { if (val) handleReplaceNodeType(val); }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select node type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="trigger">Trigger Event</SelectItem>
+                    <SelectItem value="agent">smolagent AI Agent</SelectItem>
+                    <SelectItem value="code">Python Code Block</SelectItem>
+                    <SelectItem value="http_request">HTTP Request Node</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Trigger Node Customization */}
+              {selectedNode.data.type === "trigger" && (
+                <div className="space-y-4 rounded-xl border border-purple-500/20 bg-purple-950/20 p-4">
+                  <div className="space-y-2">
+                    <Label className="text-purple-300 font-semibold flex items-center gap-1.5">
+                      <Zap className="h-4 w-4" /> Trigger Mechanism
+                    </Label>
+                    <Select
+                      value={(selectedNode.data.trigger_type as string) || "manual"}
+                      onValueChange={(val) => { if (val) updateSelectedNodeData("trigger_type", val); }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select trigger mechanism" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manual">Manual / API Trigger</SelectItem>
+                        <SelectItem value="webhook">Inbound Webhook</SelectItem>
+                        <SelectItem value="cron">Cron Schedule</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {((selectedNode.data.trigger_type as string) === "webhook" || (selectedNode.data.trigger_type as string) === "manual" || !selectedNode.data.trigger_type) && (
+                    <div className="space-y-2 pt-2">
+                      <Label className="text-xs text-muted-foreground">Webhook / API Endpoint URL</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          readOnly
+                          className="font-mono text-xs text-purple-300 bg-black/40"
+                          value={`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/execute`}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/execute`);
+                            alert("Webhook URL copied to clipboard!");
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">Send HTTP POST to trigger this workflow with JSON payload.</p>
+                    </div>
+                  )}
+
+                  {(selectedNode.data.trigger_type as string) === "cron" && (
+                    <div className="space-y-2 pt-2">
+                      <Label className="text-xs text-purple-300 flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" /> Cron Schedule (UTC)
+                      </Label>
+                      <Input
+                        placeholder="e.g. 0 * * * * or */15 * * * *"
+                        className="font-mono text-xs"
+                        value={(selectedNode.data.cron_expression as string) || "0 * * * *"}
+                        onChange={(e) => updateSelectedNodeData("cron_expression", e.target.value)}
+                      />
+                      <p className="text-[11px] text-muted-foreground">Standard 5-part cron syntax: minute hour day-of-month month day-of-week.</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-xs text-muted-foreground">Initial Input Payload Sample (JSON)</Label>
+                    <textarea
+                      rows={3}
+                      className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-xs font-mono text-purple-300"
+                      value={(selectedNode.data.default_payload as string) || '{\n  "source": "manual_trigger"\n}'}
+                      onChange={(e) => updateSelectedNodeData("default_payload", e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Dynamic Settings per Type */}
+              {selectedNode.data.type === "agent" && (
+                <div className="space-y-2">
+                  <Label>smolagent AI Instruction Prompt</Label>
+                  <textarea
+                    rows={5}
+                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+                    value={(selectedNode.data.prompt as string) || ""}
+                    onChange={(e) => updateSelectedNodeData("prompt", e.target.value)}
+                    placeholder="Describe agentic task (e.g. Read input data and format an executive summary)..."
+                  />
+                </div>
+              )}
+
+              {selectedNode.data.type === "code" && (
+                <div className="space-y-2">
+                  <Label>Python Execution Code</Label>
+                  <textarea
+                    rows={8}
+                    className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-sm shadow-sm font-mono text-emerald-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={(selectedNode.data.code as string) || ""}
+                    onChange={(e) => updateSelectedNodeData("code", e.target.value)}
+                  />
+                </div>
+              )}
+
+              {selectedNode.data.type === "http_request" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-1 space-y-2">
+                      <Label>Method</Label>
+                      <Select
+                        value={(selectedNode.data.method as string) || "GET"}
+                        onValueChange={(val) => { if (val) updateSelectedNodeData("method", val); }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GET">GET</SelectItem>
+                          <SelectItem value="POST">POST</SelectItem>
+                          <SelectItem value="PUT">PUT</SelectItem>
+                          <SelectItem value="DELETE">DELETE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <Label>Endpoint URL</Label>
+                      <Input
+                        value={(selectedNode.data.url as string) || ""}
+                        onChange={(e) => updateSelectedNodeData("url", e.target.value)}
+                        placeholder="https://api.example.com/users/{node-1.id}"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">JSON Request Body</Label>
+                    <textarea
+                      rows={4}
+                      className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-xs font-mono text-emerald-400"
+                      value={typeof selectedNode.data.body === "object" ? JSON.stringify(selectedNode.data.body, null, 2) : (selectedNode.data.body as string) || "{}"}
+                      onChange={(e) => {
+                        try {
+                          updateSelectedNodeData("body", JSON.parse(e.target.value));
+                        } catch {
+                          updateSelectedNodeData("body", e.target.value);
+                        }
+                      }}
+                      placeholder='{\n  "email": "{node-1.user_email}"\n}'
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Output Data Forwarding Selector */}
+              <div className="rounded-xl border border-purple-500/20 bg-purple-950/20 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                    <Filter className="h-3.5 w-3.5" /> Output Data Selective Forwarding
+                  </Label>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Choose which output fields this node forwards to downstream connected nodes.
+                </p>
+                <div className="space-y-2">
+                  <Select
+                    value={(selectedNode.data.output_filter_mode as string) || "all"}
+                    onValueChange={(val) => { if (val) updateSelectedNodeData("output_filter_mode", val); }}
+                  >
+                    <SelectTrigger className="bg-background/80 text-xs">
+                      <SelectValue placeholder="Select forwarding mode..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Forward All Output Fields (Default)</SelectItem>
+                      <SelectItem value="selected_keys">Forward Selected Keys Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {(selectedNode.data.output_filter_mode as string) === "selected_keys" && (
+                  <div className="space-y-2 pt-1">
+                    <Label className="text-[11px]">Keys to Forward (comma separated)</Label>
+                    <Input
+                      className="text-xs bg-background font-mono"
+                      placeholder="e.g. user_email, amount, status"
+                      value={(selectedNode.data.output_filter_keys as string) || ""}
+                      onChange={(e) => updateSelectedNodeData("output_filter_keys", e.target.value)}
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Only keys listed above will be forwarded to downstream nodes.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Upstream Parent Connected Nodes Reference Box */}
+              {selectedNode.data.type !== "trigger" && (
+                <div className="rounded-xl border border-blue-500/20 bg-blue-950/20 p-4 space-y-2">
+                  <Label className="text-blue-300 font-semibold text-xs flex items-center gap-1.5">
+                    <GitFork className="h-3.5 w-3.5" /> Upstream Parent Nodes ({getParentNodesForSelected().length})
+                  </Label>
+                  {getParentNodesForSelected().length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground italic">No parent nodes connected. Drag an edge from another node to pass data into this node.</p>
+                  ) : (
+                    <div className="space-y-2 pt-1">
+                      {getParentNodesForSelected().map((pNode) => (
+                        <div key={pNode.id} className="flex items-center justify-between p-2 rounded bg-black/40 border border-white/5 text-xs">
+                          <div>
+                            <span className="font-semibold text-foreground">{pNode.data.label as string}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono ml-2">({pNode.id})</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 text-[11px] font-mono text-purple-300 hover:text-purple-200"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`inputs['${pNode.id}']`);
+                              alert(`Copied "inputs['${pNode.id}']" reference to clipboard!`);
+                            }}
+                          >
+                            Copy Ref
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Delete Node Button */}
+              <div className="pt-6 border-t flex items-center justify-between">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => handleDeleteNode(selectedNode.id)}
+                >
+                  <Trash2 className="h-4 w-4" /> Delete Node
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Execution Logs Drawer */}
+      {isLogsOpen && (
+        <div className="absolute bottom-4 left-6 right-6 z-20 max-h-80 rounded-xl border bg-background/95 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b bg-muted/40 gap-3">
+            <div className="flex items-center gap-2 flex-1">
+              <Terminal className="h-4 w-4 text-purple-400 shrink-0" />
+              <span className="font-mono text-xs font-semibold shrink-0">Execution Logs</span>
+              
+              {/* Execution Run Selector */}
+              <div className="flex items-center gap-2 max-w-xs flex-1">
+                <Select
+                  value={activeRunId || ""}
+                  onValueChange={(val) => { if (val) setActiveRunId(val); }}
+                >
+                  <SelectTrigger className="h-7 text-xs font-mono bg-background/80">
+                    <SelectValue placeholder="Select execution run..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(executionRuns as any[]).map((run: any) => (
+                      <SelectItem key={run.id} value={run.id} className="text-xs font-mono">
+                        [{run.trigger_type.toUpperCase()}] {new Date(run.started_at).toLocaleTimeString()} ({run.status})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-purple-400"
+                  onClick={() => refetchExecutions()}
+                  title="Refresh Webhook Executions"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => setIsLogsOpen(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 font-mono text-xs">
+            {/* Display Ingested Webhook Payload / Input Data if available */}
+            {selectedRunData && selectedRunData.input_data && Object.keys(selectedRunData.input_data).length > 0 && (
+              <div className="p-3 rounded-lg border border-purple-500/20 bg-purple-950/20 space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-purple-300">
+                  <span>📥 Ingested Webhook Payload Data ({selectedRunData.trigger_type})</span>
+                  <Badge variant="outline" className="text-[9px] uppercase border-purple-500/30 text-purple-300">
+                    {selectedRunData.status}
+                  </Badge>
+                </div>
+                <pre className="text-purple-200 whitespace-pre-wrap text-[11px] bg-black/40 p-2 rounded border border-purple-500/10">
+                  {JSON.stringify(selectedRunData.input_data, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            {/* Display Step Logs */}
+            {activeStepLogs.length > 0 ? (
+              (activeStepLogs as any[]).map((step: any) => (
+                <div key={step.id} className="p-2.5 rounded-lg border border-white/5 bg-black/40 space-y-1">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="text-purple-400 font-bold">[{step.node_type}] {step.node_name}</span>
+                    <span className="text-[10px]">{step.execution_time_ms}ms</span>
+                  </div>
+                  {step.thought_trace && (
+                    <pre className="text-pink-300/90 whitespace-pre-wrap text-[11px] bg-pink-950/20 p-2 rounded border border-pink-500/10">
+                      {step.thought_trace}
+                    </pre>
+                  )}
+                  {step.output_data && (
+                    <pre className="text-emerald-300 whitespace-pre-wrap text-[11px] bg-emerald-950/20 p-2 rounded border border-emerald-500/10">
+                      {JSON.stringify(step.output_data, null, 2)}
+                    </pre>
+                  )}
+                  {step.error_message && (
+                    <pre className="text-rose-400 whitespace-pre-wrap text-[11px] bg-rose-950/20 p-2 rounded border border-rose-500/10">
+                      {step.error_message}
+                    </pre>
+                  )}
+                </div>
+              ))
+            ) : stepLogs.length > 0 ? (
+              stepLogs.map((log, idx) => (
+                <div key={idx} className="p-2.5 rounded-lg border border-white/5 bg-black/40 space-y-1">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="text-purple-400 font-bold">[{log.event}]</span>
+                    <span>Node: {log.data?.node_name || log.data?.node_id}</span>
+                  </div>
+                  {log.data?.thought_trace && (
+                    <pre className="text-pink-300/90 whitespace-pre-wrap text-[11px] bg-pink-950/20 p-2 rounded border border-pink-500/10">
+                      {log.data.thought_trace}
+                    </pre>
+                  )}
+                  {log.data?.output && (
+                    <pre className="text-emerald-300 whitespace-pre-wrap text-[11px] bg-emerald-950/20 p-2 rounded border border-emerald-500/10">
+                      {JSON.stringify(log.data.output, null, 2)}
+                    </pre>
+                  )}
+                  {log.data?.error && (
+                    <pre className="text-rose-400 whitespace-pre-wrap text-[11px] bg-rose-950/20 p-2 rounded border border-rose-500/10">
+                      {log.data.error}
+                    </pre>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="text-muted-foreground italic text-center py-4">
+                No execution logs found for this run. Click 'Test Execute' or invoke the webhook URL to see execution logs.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+      </div>
+
+      {/* Create Custom Node Dialog Modal */}
+      <Dialog open={isCustomToolModalOpen} onOpenChange={setIsCustomToolModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-400" /> Create Custom Tool / Node
+            </DialogTitle>
+            <DialogDescription>
+              Define a reusable custom tool to add to your Node Collection palette.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Tool Name</Label>
+              <Input
+                placeholder="e.g. Lead Data Normalizer"
+                value={customToolName}
+                onChange={(e) => setCustomToolName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input
+                placeholder="Brief summary of what this tool does..."
+                value={customToolDesc}
+                onChange={(e) => setCustomToolDesc(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tool Type</Label>
+              <Select
+                value={customToolType}
+                onValueChange={(val) => { if (val) setCustomToolType(val as any); }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select tool type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="python_code">Python Code Snippet</SelectItem>
+                  <SelectItem value="http_api">HTTP REST API Endpoint</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>{customToolType === "python_code" ? "Python Code" : "REST Endpoint URL"}</Label>
+              {customToolType === "python_code" ? (
+                <textarea
+                  rows={6}
+                  className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-xs font-mono text-emerald-400"
+                  value={customToolCodeOrUrl}
+                  onChange={(e) => setCustomToolCodeOrUrl(e.target.value)}
+                  placeholder="output = {'result': inputs}"
+                />
+              ) : (
+                <Input
+                  value={customToolCodeOrUrl}
+                  onChange={(e) => setCustomToolCodeOrUrl(e.target.value)}
+                  placeholder="https://api.example.com/v1/data"
+                />
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCustomToolModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateCustomTool} disabled={createCustomToolMutation.isPending} className="bg-purple-600 hover:bg-purple-500">
+              {createCustomToolMutation.isPending ? "Saving..." : "Save Custom Node"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
