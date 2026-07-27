@@ -1,5 +1,6 @@
 import os
 import socket
+import urllib.parse
 from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,18 +13,37 @@ def sanitize_db_url(url: str) -> str:
     if not url:
         return url
     
-    # 1. Automatically convert postgres:// or postgresql:// to postgresql+asyncpg://
-    if url.startswith("postgres://"):
-        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
-    elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
-        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    # Strip leading/trailing whitespace, quotes, and carriage returns
+    url = url.strip().strip("'").strip('"').strip()
 
-    # 2. Convert host.docker.internal if unresolvable
+    # 1. Convert postgres:// or postgresql:// to postgresql+asyncpg://
+    if url.startswith("postgres://"):
+        url = "postgresql+asyncpg://" + url[11:]
+    elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+        url = "postgresql+asyncpg://" + url[13:]
+
+    # 2. Fix unencoded special characters in password (e.g. '@', '#') if multiple '@' exist
+    if url.count("@") > 1:
+        try:
+            scheme_sep = "://"
+            if scheme_sep in url:
+                scheme, rest = url.split(scheme_sep, 1)
+                user_pass_part, host_part = rest.rsplit("@", 1)
+                if ":" in user_pass_part:
+                    user, password = user_pass_part.split(":", 1)
+                    # Unquote first in case partially encoded, then quote fully
+                    unquoted_password = urllib.parse.unquote(password)
+                    encoded_password = urllib.parse.quote(unquoted_password, safe="")
+                    url = f"{scheme}://{user}:{encoded_password}@{host_part}"
+        except Exception:
+            pass
+
+    # 3. Convert host.docker.internal if unresolvable
     if "host.docker.internal" in url:
         try:
             socket.gethostbyname("host.docker.internal")
         except socket.gaierror:
-            return url.replace("host.docker.internal", "127.0.0.1")
+            url = url.replace("host.docker.internal", "127.0.0.1")
             
     return url
 
