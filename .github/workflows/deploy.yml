@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy-to-digitalocean:
-    name: Deploy to DigitalOcean Server
+    name: Zero-Downtime Deploy to DigitalOcean
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +23,7 @@ jobs:
           source: "."
           target: "${{ secrets.DO_APP_DIR }}"
 
-      - name: Build & Launch Stack on DigitalOcean via SSH
+      - name: Execute Zero-Downtime Build & Deployment via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DO_HOST }}
@@ -47,8 +47,11 @@ jobs:
             PORT=4000
             EOF
 
-            # Build images on server and restart containers
-            docker compose up -d --build --remove-orphans
+            # 1. Build new images first (old containers remain active serving traffic)
+            docker compose build
 
-            # Clean up dangling build images
+            # 2. Re-create and restart containers instantly with new images (Zero Downtime)
+            docker compose up -d --no-build --remove-orphans
+
+            # 3. Prune dangling build images
             docker image prune -f

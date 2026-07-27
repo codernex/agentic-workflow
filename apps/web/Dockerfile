@@ -6,15 +6,10 @@ RUN corepack enable
 FROM base AS deps
 WORKDIR /app
 
-# Copy monorepo configuration files
+# Copy workspace configuration files and package manifests
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
-
-# Copy shared workspace packages
 COPY packages ./packages
-
-# Copy app package definitions
 COPY apps/web/package.json ./apps/web/package.json
-
 
 # Install dependencies across monorepo workspace
 RUN pnpm install --frozen-lockfile
@@ -22,11 +17,10 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages ./packages
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+# Copy entire installed node_modules and workspace tree from deps
+COPY --from=deps /app ./
 
-# Copy full application code for web app
+# Copy full web application source code
 COPY apps/web ./apps/web
 
 ENV NODE_ENV=production
