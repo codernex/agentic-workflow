@@ -1,0 +1,50 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: workflow-redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  engine:
+    build:
+      context: .
+      dockerfile: apps/engine/Dockerfile
+    container_name: workflow-engine
+    restart: always
+    network_mode: "host"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:-redis://127.0.0.1:6379/0}
+      JWT_SECRET: ${JWT_SECRET:-change_this_to_a_secure_jwt_secret}
+      MAILTRAP_API_TOKEN: ${MAILTRAP_API_TOKEN:-}
+      SENDER_EMAIL: ${SENDER_EMAIL:-no-reply@codernex.dev}
+      SENDER_NAME: ${SENDER_NAME:-Agentic Workflow}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o}
+      SUPERMEMORY_API_KEY: ${SUPERMEMORY_API_KEY:-}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: workflow-web
+    restart: always
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:9000/api/v1}
+
+volumes:
+  redis_data:
