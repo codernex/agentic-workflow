@@ -21,7 +21,10 @@ if settings.DATABASE_URL:
     db_url = settings.DATABASE_URL.strip().strip("'").strip('"').strip()
     safe_host = db_url.split('@')[-1] if '@' in db_url else db_url
     print(f"[Alembic] Connecting to database host: {safe_host}")
-    config.set_main_option("sqlalchemy.url", db_url)
+    # Escape '%' as '%%' to prevent configparser interpolation errors
+    alembic_url = db_url.replace("%", "%%")
+    config.set_main_option("sqlalchemy.url", alembic_url)
+
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:
