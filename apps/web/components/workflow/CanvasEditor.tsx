@@ -31,6 +31,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   listWorkflowsApiV1WorkflowsGetQueryKey,
+  getWorkflowApiV1WorkflowsWorkflowIdGetOptions,
   getWorkflowApiV1WorkflowsWorkflowIdGetQueryKey,
   listCustomToolsApiV1ToolsCustomGetOptions,
   listCustomToolsApiV1ToolsCustomGetQueryKey,
@@ -96,6 +97,29 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
   // Saving & Toast Notification State
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+
+  // Fetch workflow details including webhook_secret
+  const { data: workflowData, refetch: refetchWorkflow } = useQuery(
+    getWorkflowApiV1WorkflowsWorkflowIdGetOptions({
+      path: { workflow_id: workflowId }
+    })
+  );
+
+  const handleRegenerateSecret = async () => {
+    try {
+      const res = await fetch(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/regenerate-secret`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+      });
+      if (res.ok) {
+        refetchWorkflow();
+      }
+    } catch (e) {
+      console.error("Failed to regenerate webhook secret:", e);
+    }
+  };
 
   // Fetch execution runs for this workflow
   const { data: executionRuns = [], refetch: refetchExecutions } = useQuery({
@@ -569,6 +593,9 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
 
         {/* Action Controls */}
         <div className="pointer-events-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setIsWebhookModalOpen(true)} className="gap-2">
+            <Zap className="h-4 w-4 text-amber-400" /> Webhook Secret API
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setIsLogsOpen(!isLogsOpen)} className="gap-2">
             <Terminal className="h-4 w-4 text-purple-400" /> Execution Logs
           </Button>
@@ -1087,6 +1114,77 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
             <Button onClick={handleCreateCustomTool} disabled={createCustomToolMutation.isPending} className="bg-purple-600 hover:bg-purple-500">
               {createCustomToolMutation.isPending ? "Saving..." : "Save Custom Node"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Webhook Secret & Trigger Protection Settings Modal */}
+      <Dialog open={isWebhookModalOpen} onOpenChange={setIsWebhookModalOpen}>
+        <DialogContent className="sm:max-w-[540px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-amber-400" /> Inbound Webhook Secret Settings
+            </DialogTitle>
+            <DialogDescription>
+              Trigger this workflow externally from GitHub, Stripe, Typeform, or cURL using your protected secret token.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold">Authenticated Webhook Trigger URL</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  readOnly
+                  className="font-mono text-xs bg-muted/40"
+                  value={`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/webhook?secret=${(workflowData as any)?.webhook_secret || ""}`}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/webhook?secret=${(workflowData as any)?.webhook_secret || ""}`);
+                    setCopiedWebhook(true);
+                    setTimeout(() => setCopiedWebhook(false), 2000);
+                  }}
+                >
+                  {copiedWebhook ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                  {copiedWebhook ? "Copied!" : "Copy URL"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-bold">Webhook Secret Token</Label>
+                  <p className="text-xs text-muted-foreground">Keep this secret safe. If compromised, rotate it below.</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="gap-1 text-xs"
+                  onClick={handleRegenerateSecret}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Rotate Secret
+                </Button>
+              </div>
+              <Input
+                readOnly
+                className="font-mono text-xs bg-muted/40 text-purple-300"
+                value={(workflowData as any)?.webhook_secret || "Loading secret..."}
+              />
+            </div>
+
+            <div className="p-3 rounded-lg border bg-purple-950/20 border-purple-500/20 text-xs space-y-1.5 text-purple-200">
+              <p className="font-bold">cURL Command Example:</p>
+              <code className="block p-2 rounded bg-black/40 font-mono text-[11px] overflow-x-auto text-emerald-300">
+                {`curl -X POST "${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/webhook?secret=${(workflowData as any)?.webhook_secret || "YOUR_SECRET"}" -H "Content-Type: application/json" -d '{"data": "payload"}'`}
+              </code>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsWebhookModalOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

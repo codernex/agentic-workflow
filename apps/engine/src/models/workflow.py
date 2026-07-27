@@ -6,6 +6,9 @@ from sqlmodel import SQLModel, Field, Column, JSON
 def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
+def generate_webhook_secret() -> str:
+    return f"wf_sec_{uuid.uuid4().hex}"
+
 class WorkflowBase(SQLModel):
     name: str
     description: Optional[str] = None
@@ -18,6 +21,7 @@ class Workflow(WorkflowBase, table=True):
     __tablename__ = "workflows"
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    webhook_secret: str = Field(default_factory=generate_webhook_secret, index=True, nullable=False)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -34,5 +38,6 @@ class WorkflowUpdate(SQLModel):
 class WorkflowRead(WorkflowBase):
     id: str
     user_id: Optional[str] = None
+    webhook_secret: str
     created_at: datetime
     updated_at: datetime
