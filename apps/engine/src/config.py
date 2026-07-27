@@ -1,10 +1,31 @@
 import os
+import socket
 from pathlib import Path
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Find root .env file
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
 ENV_FILE = ROOT_DIR / ".env"
+
+def sanitize_db_url(url: str) -> str:
+    if not url:
+        return url
+    
+    # 1. Automatically convert postgres:// or postgresql:// to postgresql+asyncpg://
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    # 2. Convert host.docker.internal if unresolvable
+    if "host.docker.internal" in url:
+        try:
+            socket.gethostbyname("host.docker.internal")
+        except socket.gaierror:
+            return url.replace("host.docker.internal", "127.0.0.1")
+            
+    return url
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Agentic Workflow Engine"
@@ -26,7 +47,13 @@ class Settings(BaseSettings):
 
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_MODEL: str = "openai/gpt-4o"
-    
+    SUPERMEMORY_API_KEY: str = ""
+
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        return sanitize_db_url(v)
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE) if ENV_FILE.exists() else None,
         env_file_encoding="utf-8",
