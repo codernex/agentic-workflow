@@ -157,6 +157,25 @@ export default function LoginPage() {
           {/* LOGIN FORM */}
           {mode === "login" && (
             <form onSubmit={handleLogin} className="space-y-4">
+              {/* Quick Demo Credentials Button */}
+              <div className="p-2.5 rounded-lg border border-purple-500/20 bg-purple-950/20 flex items-center justify-between text-xs text-purple-300">
+                <div>
+                  <span className="font-semibold block text-[11px] text-purple-200">Demo Account:</span>
+                  <span className="font-mono text-[10px] text-muted-foreground">borhan.dev@gmail.com • 123456</span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs gap-1 border-purple-500/30 hover:bg-purple-500/10 cursor-pointer"
+                  onClick={() => {
+                    setEmail("borhan.dev@gmail.com");
+                    setPassword("123456");
+                  }}
+                >
+                  <Sparkles className="h-3 w-3 text-purple-400" /> Use Demo
+                </Button>
+              </div>
               <div className="space-y-2">
                 <Label className="text-xs">Email Address</Label>
                 <div className="relative">
