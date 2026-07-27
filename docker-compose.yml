@@ -38,13 +38,17 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://api-workflow.codernex.dev/api/v1}
+        NEXT_PUBLIC_ENGINE_URL: ${NEXT_PUBLIC_ENGINE_URL:-https://api-workflow.codernex.dev}
     container_name: workflow-web
     restart: always
     ports:
       - "4000:4000"
     environment:
       PORT: 4000
-      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:9000/api/v1}
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-https://api-workflow.codernex.dev/api/v1}
+      NEXT_PUBLIC_ENGINE_URL: ${NEXT_PUBLIC_ENGINE_URL:-https://api-workflow.codernex.dev}
 
 volumes:
   redis_data:
