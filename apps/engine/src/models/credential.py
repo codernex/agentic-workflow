@@ -32,6 +32,7 @@ class Credential(CredentialBase, table=True):
     __tablename__ = "credentials"
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    user_id: Optional[str] = Field(default=None, foreign_key="users.id", index=True)
     encrypted_data: str
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
@@ -44,5 +45,6 @@ class CredentialCreate(CredentialBase):
 
 class CredentialRead(CredentialBase):
     id: str
+    user_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime

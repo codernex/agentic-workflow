@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 export default function WorkflowsPage() {
   const queryClient = useQueryClient();
@@ -79,7 +80,8 @@ export default function WorkflowsPage() {
   );
 
   return (
-    <div className="container mx-auto p-8 space-y-8 max-w-7xl">
+    <ProtectedRoute>
+      <div className="container mx-auto p-8 space-y-8 max-w-7xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6">
         <div>
@@ -198,5 +200,6 @@ export default function WorkflowsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </ProtectedRoute>
   );
 }

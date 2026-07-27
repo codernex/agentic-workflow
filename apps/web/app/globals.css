@@ -134,11 +134,29 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
+
+  button,
+  a,
+  select,
+  summary,
+  [role="button"],
+  [role="option"],
+  [role="tab"],
+  [role="menuitem"],
+  [data-radix-collection-item],
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  .cursor-pointer {
+    cursor: pointer !important;
+  }
 }

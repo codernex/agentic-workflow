@@ -16,6 +16,7 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True, nullable=False)
     is_verified: bool = Field(default=False, nullable=False)
     verification_token: Optional[str] = Field(default=None, nullable=True)
+    free_credits: int = Field(default=50, nullable=False)
     created_at: datetime = Field(default_factory=utc_now_naive, nullable=False)
     updated_at: datetime = Field(default_factory=utc_now_naive, nullable=False)
 
@@ -42,6 +43,7 @@ class UserRead(SQLModel):
     full_name: Optional[str] = None
     is_active: bool
     is_verified: bool
+    free_credits: int
     created_at: datetime
 
 class Token(SQLModel):

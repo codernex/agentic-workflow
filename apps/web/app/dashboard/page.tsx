@@ -27,6 +27,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 export default function UserDashboardPage() {
   const router = useRouter();
@@ -88,7 +89,8 @@ export default function UserDashboardPage() {
   };
 
   return (
-    <div className="container mx-auto p-8 space-y-10 max-w-7xl">
+    <ProtectedRoute>
+      <div className="container mx-auto p-8 space-y-10 max-w-7xl">
       {/* Unverified Email Warning Banner */}
       {user && !user.is_verified && (
         <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-950/30 backdrop-blur-xl flex flex-col md:flex-row items-center justify-between gap-4 text-amber-200 text-xs">
@@ -313,7 +315,9 @@ export default function UserDashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Onboarding Wizard Modal */}
       <OnboardingWizard isOpen={isOnboardingOpen} onOpenChange={setIsOnboardingOpen} />
     </div>
+    </ProtectedRoute>
   );
 }

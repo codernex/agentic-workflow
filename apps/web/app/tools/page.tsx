@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 export default function ToolsPage() {
   const queryClient = useQueryClient();
@@ -77,16 +78,17 @@ export default function ToolsPage() {
   };
 
   return (
-    <div className="container mx-auto p-8 space-y-10 max-w-7xl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Tools & Nodes Registry</h1>
-          <p className="text-sm text-muted-foreground">Built-in execution blocks and custom tools available for visual canvas nodes.</p>
+    <ProtectedRoute>
+      <div className="container mx-auto p-8 space-y-10 max-w-7xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-6">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight">Tools & Nodes Registry</h1>
+            <p className="text-sm text-muted-foreground">Built-in execution blocks and custom tools available for visual canvas nodes.</p>
+          </div>
+          <Button onClick={() => setIsOpen(true)} className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white">
+            <Plus className="h-4 w-4" /> Create Custom Tool
+          </Button>
         </div>
-        <Button onClick={() => setIsOpen(true)} className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white">
-          <Plus className="h-4 w-4" /> Create Custom Tool
-        </Button>
-      </div>
 
       {/* Built-in Nodes Section */}
       <div className="space-y-4">
@@ -198,5 +200,6 @@ export default function ToolsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </ProtectedRoute>
   );
 }

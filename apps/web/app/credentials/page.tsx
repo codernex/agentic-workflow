@@ -16,8 +16,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { useAuth } from "@/context/AuthContext";
 
 export default function CredentialsPage() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
@@ -67,16 +70,22 @@ export default function CredentialsPage() {
   };
 
   return (
-    <div className="container mx-auto p-8 space-y-8 max-w-7xl">
-      <div className="flex items-center justify-between border-b pb-6">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Credentials Vault</h1>
-          <p className="text-sm text-muted-foreground">Securely store Fernet-encrypted API keys and OAuth tokens for node tools.</p>
+    <ProtectedRoute>
+      <div className="container mx-auto p-8 space-y-8 max-w-7xl">
+        <div className="flex items-center justify-between border-b pb-6">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-extrabold tracking-tight">Credentials Vault</h1>
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs">
+                {user?.free_credits ?? 50} Free Credits Remaining
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">Securely store Fernet-encrypted API keys for your account. Fallback uses application free-tier credits.</p>
+          </div>
+          <Button onClick={() => setIsOpen(true)} className="gap-2 bg-purple-600 hover:bg-purple-500">
+            <Plus className="h-4 w-4" /> Add Credential
+          </Button>
         </div>
-        <Button onClick={() => setIsOpen(true)} className="gap-2 bg-purple-600 hover:bg-purple-500">
-          <Plus className="h-4 w-4" /> Add Credential
-        </Button>
-      </div>
 
       {isLoading ? (
         <div className="p-12 text-center text-muted-foreground">Loading credentials vault via React Query...</div>
@@ -157,5 +166,6 @@ export default function CredentialsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </ProtectedRoute>
   );
 }

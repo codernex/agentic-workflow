@@ -10,6 +10,7 @@ export interface UserProfile {
   full_name?: string | null;
   is_active: boolean;
   is_verified: boolean;
+  free_credits: number;
   created_at: string;
 }
 
@@ -32,17 +33,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Configure bearer token header on openapi client
+  // Configure bearer token header on openapi client and sync cookie for middleware
   const setAuthToken = (newToken: string | null) => {
     setToken(newToken);
     if (newToken) {
       localStorage.setItem("access_token", newToken);
+      document.cookie = `access_token=${newToken}; path=/; max-age=86400; SameSite=Lax`;
       client.setConfig({
         baseUrl: ENGINE_BASE_URL,
         headers: { Authorization: `Bearer ${newToken}` },
       });
     } else {
       localStorage.removeItem("access_token");
+      document.cookie = "access_token=; path=/; max-age=0;";
       client.setConfig({
         baseUrl: ENGINE_BASE_URL,
         headers: {},
