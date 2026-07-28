@@ -1178,6 +1178,116 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
                 </div>
               )}
 
+              {selectedNode.data.type === "filter" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold text-purple-300">Filter & Transformation Method</Label>
+                    <Select
+                      value={(selectedNode.data.output_filter_mode as string) || "selected_keys"}
+                      onValueChange={(val) => { if (val) updateSelectedNodeData("output_filter_mode", val); }}
+                    >
+                      <SelectTrigger className="bg-background/80 text-xs">
+                        <SelectValue placeholder="Select filter mode..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="selected_keys">1. Keep Specific Keys (Whitelist)</SelectItem>
+                        <SelectItem value="custom_mapping">2. Key Renaming & Remapping (JSON)</SelectItem>
+                        <SelectItem value="code">3. Python Expression Transformation</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {((selectedNode.data.output_filter_mode as string) === "selected_keys" || !selectedNode.data.output_filter_mode) && (
+                    <div className="space-y-2 pt-1">
+                      <Label className="text-xs font-semibold">Keys to Keep (Comma Separated)</Label>
+                      <Input
+                        className="text-xs bg-black/40 font-mono text-emerald-400"
+                        placeholder="e.g. user_email, status, score, user_id"
+                        value={(selectedNode.data.output_filter_keys as string) || ""}
+                        onChange={(e) => updateSelectedNodeData("output_filter_keys", e.target.value)}
+                      />
+                      <p className="text-[11px] text-muted-foreground">Strips out all unlisted keys from parent output payload, passing only the selected fields.</p>
+                    </div>
+                  )}
+
+                  {(selectedNode.data.output_filter_mode as string) === "custom_mapping" && (
+                    <div className="space-y-2 pt-1">
+                      <Label className="text-xs font-semibold">JSON Field Remapping Schema</Label>
+                      <textarea
+                        rows={5}
+                        className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-xs font-mono text-purple-300"
+                        value={typeof selectedNode.data.output_filter_mapping === "object" ? JSON.stringify(selectedNode.data.output_filter_mapping, null, 2) : (selectedNode.data.output_filter_mapping as string) || '{\n  "recipient": "{node-1.email}",\n  "status_code": "{node-2.status}"\n}'}
+                        onChange={(e) => {
+                          try {
+                            updateSelectedNodeData("output_filter_mapping", JSON.parse(e.target.value));
+                          } catch {
+                            updateSelectedNodeData("output_filter_mapping", e.target.value);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {(selectedNode.data.output_filter_mode as string) === "code" && (
+                    <div className="space-y-2 pt-1">
+                      <Label className="text-xs font-semibold">Python Transformation Code</Label>
+                      <textarea
+                        rows={6}
+                        className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-xs font-mono text-emerald-400"
+                        value={(selectedNode.data.code as string) || "output = {'email': inputs['node-1']['email'], 'active': True}"}
+                        onChange={(e) => updateSelectedNodeData("code", e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Filter Capabilities Overview Card */}
+                  <div className="p-3.5 rounded-xl border border-purple-500/20 bg-purple-950/20 text-xs space-y-2 text-purple-200">
+                    <p className="font-bold text-purple-300 flex items-center gap-1.5">
+                      <Filter className="h-4 w-4 shrink-0 text-purple-400" /> How Data Filter & Mapper Works:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-[11px] text-muted-foreground leading-relaxed font-sans">
+                      <li><strong>Cleans Heavy Payloads:</strong> Strips thousands of unwanted API fields, keeping only relevant parameters.</li>
+                      <li><strong>Reshapes JSON Structure:</strong> Renames keys to match the exact input structure expected by downstream Email or HTTP nodes.</li>
+                      <li><strong>Array & Value Mapping:</strong> Performs list filtering and type conversions before passing to child nodes.</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {selectedNode.data.type === "condition" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold">Boolean Condition Expression (Python)</Label>
+                    <textarea
+                      rows={4}
+                      className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-xs font-mono text-amber-300"
+                      value={(selectedNode.data.code as string) || (selectedNode.data.condition as string) || "output = inputs['node-1']['status_code'] == 200"}
+                      onChange={(e) => {
+                        updateSelectedNodeData("code", e.target.value);
+                        updateSelectedNodeData("condition", e.target.value);
+                      }}
+                      placeholder="output = inputs['node-1']['score'] >= 80"
+                    />
+                  </div>
+
+                  {/* Condition Examples Card */}
+                  <div className="p-3.5 rounded-xl border border-amber-500/20 bg-amber-950/20 text-xs space-y-2 text-amber-200">
+                    <p className="font-bold text-amber-300 flex items-center gap-1.5">
+                      <GitFork className="h-4 w-4 shrink-0 text-amber-400" /> Condition Expression Examples:
+                    </p>
+                    <div className="space-y-1.5 text-[11px] font-mono bg-black/40 p-2.5 rounded border border-amber-500/10">
+                      <p><span className="text-muted-foreground">HTTP Status Check:</span> <code className="text-emerald-400">output = inputs['node-1']['status_code'] == 200</code></p>
+                      <p><span className="text-muted-foreground">Threshold Check:</span> <code className="text-emerald-400">output = inputs['node-2']['score'] &gt;= 80</code></p>
+                      <p><span className="text-muted-foreground">String Search:</span> <code className="text-emerald-400">output = 'urgent' in inputs['node-1']['body'].lower()</code></p>
+                    </div>
+                    <ul className="list-disc list-inside space-y-1 text-[11px] text-muted-foreground leading-relaxed font-sans pt-1">
+                      <li><strong>Condition Output:</strong> Returns <code className="text-amber-300 font-mono">{"{ condition_met: true, output: true }"}</code> on match.</li>
+                      <li><strong>Child Node Routing:</strong> Downstream nodes inspect <code className="text-purple-300 font-mono">condition_met</code> to decide whether to execute or skip.</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+
               {/* Output Data Forwarding Selector */}
               <div className="rounded-xl border border-purple-500/20 bg-purple-950/20 p-4 space-y-3">
                 <div className="flex items-center justify-between">
