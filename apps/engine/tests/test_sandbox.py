@@ -43,3 +43,24 @@ async def test_sandbox_timeout():
     with pytest.raises(TimeoutError) as exc_info:
         await execute_sandbox_python(code, inputs, timeout_seconds=1.0)
     assert "timed out" in str(exc_info.value)
+
+@pytest.mark.asyncio
+async def test_sandbox_steps_and_logging():
+    inputs = {"node-2": {"value": 10}}
+    steps = {
+        "node-1": {"status_code": 200, "data": {"user": "Alice"}},
+        "node-2": {"value": 10}
+    }
+    code = """
+log("Processing step data for", steps['node-1']['data']['user'])
+print("Calculated output value:", steps['node-2']['value'] * 5)
+output = {
+    "user": steps['node-1']['data']['user'],
+    "result_val": steps['node-2']['value'] * 5
+}
+"""
+    result, logs = await execute_sandbox_python(code, inputs, steps=steps, return_logs=True)
+    assert result == {"user": "Alice", "result_val": 50}
+    assert "Processing step data for Alice" in logs[0]
+    assert "Calculated output value: 50" in logs[1]
+

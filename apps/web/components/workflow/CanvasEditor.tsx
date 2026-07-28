@@ -17,7 +17,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { Play, Save, Plus, Zap, Bot, Code, Globe, GitFork, Terminal, RefreshCw, X, Check, Trash2, Copy, Clock, Layers, Wrench, Sparkles, ChevronLeft, ChevronRight, Search, Loader2, CheckCircle2, Database, Mail, Filter } from "lucide-react";
+import { Play, Save, Plus, Zap, Bot, Code, Globe, GitFork, Terminal, RefreshCw, X, Check, Trash2, Copy, Clock, Layers, Wrench, Sparkles, ChevronLeft, ChevronRight, Search, Loader2, CheckCircle2, Database, Mail, Filter, Download, Upload, FileJson } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -99,6 +99,124 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isWebhookModalOpen, setIsWebhookModalOpen] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
+
+  // Hidden File Input Ref for Import
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // Export Workflow JSON (Without Database Internal IDs)
+  const handleExportWorkflowJson = () => {
+    const cleanNodes = nodes.map((node) => {
+      const { status, ...cleanData } = (node.data || {}) as any;
+      return {
+        id: node.id,
+        type: node.type || "customNode",
+        position: node.position,
+        data: cleanData,
+      };
+    });
+
+    const cleanEdges = edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      animated: edge.animated ?? true,
+      style: edge.style || { stroke: "#8b5cf6", strokeWidth: 2 },
+    }));
+
+    const exportData = {
+      name: workflowName,
+      exported_at: new Date().toISOString(),
+      nodes: cleanNodes,
+      edges: cleanEdges,
+    };
+
+    const jsonStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const filename = `${(workflowName || "workflow").toLowerCase().replace(/[^a-z0-9]/g, "_")}_export.json`;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Trigger File Input Click for Import
+  const handleTriggerImportClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Import Workflow JSON Handler
+  const handleImportWorkflowJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+
+        if (!parsed || !Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) {
+          alert("Invalid workflow JSON file format. Must contain 'nodes' and 'edges' arrays.");
+          return;
+        }
+
+        // Remap IDs to ensure unique visual node/edge identifiers without internal DB IDs
+        const idMapping: Record<string, string> = {};
+        const importedNodes: Node[] = parsed.nodes.map((n: any, idx: number) => {
+          const newId = `node-${Date.now()}-${idx + 1}`;
+          idMapping[n.id] = newId;
+          const { status, ...cleanData } = n.data || {};
+          return {
+            id: newId,
+            type: n.type || "customNode",
+            position: n.position || { x: 250 + idx * 40, y: 150 + idx * 40 },
+            data: cleanData,
+          };
+        });
+
+        const importedEdges: Edge[] = parsed.edges.map((e: any, idx: number) => ({
+          id: `edge-${Date.now()}-${idx + 1}`,
+          source: idMapping[e.source] || e.source,
+          target: idMapping[e.target] || e.target,
+          animated: e.animated ?? true,
+          style: e.style || { stroke: "#8b5cf6", strokeWidth: 2 },
+        }));
+
+        setNodes(importedNodes);
+        setEdges(importedEdges);
+
+        // Auto-save the imported workflow canvas graph to database
+        await fetch(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: parsed.name ? `${parsed.name} (Imported)` : workflowName,
+            nodes: importedNodes,
+            edges: importedEdges,
+          }),
+        });
+
+        queryClient.invalidateQueries({ queryKey: listWorkflowsApiV1WorkflowsGetQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getWorkflowApiV1WorkflowsWorkflowIdGetQueryKey({ path: { workflow_id: workflowId } }) });
+
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2500);
+        alert(`Successfully imported workflow with ${importedNodes.length} nodes!`);
+      } catch (err) {
+        console.error("Failed to parse imported workflow JSON:", err);
+        alert("Failed to parse JSON file. Please ensure it is valid JSON.");
+      }
+    };
+
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   // Fetch workflow details including webhook_secret
   const { data: workflowData, refetch: refetchWorkflow } = useQuery(
@@ -215,7 +333,8 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
     {
       category: "Logic & Code",
       items: [
-        { type: "code", label: "Python Code Block", code: "output = {'processed': inputs}", desc: "Inline Python execution with inputs dict.", icon: Code, color: "text-blue-400" },
+        { type: "code", label: "Python Code Block", code: "log('Processing previous steps...')\noutput = {'result': steps}\n", desc: "Inline Python sandbox with steps history and log() helper.", icon: Code, color: "text-blue-400" },
+        { type: "logger", label: "Step Result Logger", desc: "Captures and logs outputs from all previous step calls.", icon: Terminal, color: "text-teal-400" },
         { type: "condition", label: "Conditional Router", desc: "Evaluates if/else conditions on inputs.", icon: GitFork, color: "text-amber-400" },
         { type: "filter", label: "Data Filter & Mapper", desc: "Transforms and filters nested JSON values.", icon: Filter, color: "text-purple-400" },
       ],
@@ -270,7 +389,7 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
         label,
         type,
         prompt: type === "agent" ? "Analyze inputs and execute decision logic." : undefined,
-        code: type === "code" ? "output = {'result': inputs}" : undefined,
+        code: type === "code" ? "log('Accessing previous steps...')\noutput = {'result': steps}\n" : undefined,
         url: type === "http_request" ? "https://api.github.com/zen" : undefined,
       },
     };
@@ -314,6 +433,7 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
       trigger: "Event Trigger",
       agent: "smolagent AI",
       code: "Python Code",
+      logger: "Step Logger",
       http_request: "HTTP Request",
       condition: "Condition Node",
     };
@@ -328,7 +448,7 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
               type: newType,
               label: defaultLabels[newType] || newType,
               prompt: newType === "agent" ? (n.data.prompt || "Analyze inputs and execute decision logic.") : n.data.prompt,
-              code: newType === "code" ? (n.data.code || "output = {'result': inputs}") : n.data.code,
+              code: newType === "code" ? (n.data.code || "log('Accessing previous steps...')\noutput = {'result': steps}\n") : n.data.code,
               url: newType === "http_request" ? (n.data.url || "https://api.github.com/zen") : n.data.url,
               trigger_type: newType === "trigger" ? (n.data.trigger_type || "manual") : n.data.trigger_type,
             },
@@ -368,7 +488,115 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
     }
   };
 
-  // Run Workflow Execution & Connect WebSocket
+  // Store refetch functions in refs to avoid useEffect dependency churn
+  const refetchExecutionsRef = React.useRef(refetchExecutions);
+  const refetchStepLogsRef = React.useRef(refetchStepLogs);
+
+  useEffect(() => {
+    refetchExecutionsRef.current = refetchExecutions;
+    refetchStepLogsRef.current = refetchStepLogs;
+  }, [refetchExecutions, refetchStepLogs]);
+
+  // Real-time Workflow WebSocket listener (for inbound webhooks, cron, manual runs)
+  useEffect(() => {
+    if (!workflowId) return;
+
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let isSubscribed = true;
+
+    const connectWs = () => {
+      if (!isSubscribed) return;
+      try {
+        ws = new WebSocket(`${ENGINE_WS_URL}/api/v1/ws/workflows/${workflowId}`);
+
+        ws.onopen = () => {
+          console.log(`[WS] Subscribed to workflow ${workflowId}`);
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            const eventType = payload.event;
+            const data = payload.data || {};
+
+            if (eventType === "run_start") {
+              setIsRunning(true);
+              if (data.run_id) {
+                setActiveRunId(data.run_id);
+              }
+              refetchExecutionsRef.current();
+              refetchStepLogsRef.current();
+            } else if (eventType === "step_start") {
+              setIsRunning(true);
+              if (data.node_id) {
+                setNodes((nds) =>
+                  nds.map((n) => (n.id === data.node_id ? { ...n, data: { ...n.data, status: "running" } } : n))
+                );
+              }
+              refetchStepLogsRef.current();
+            } else if (eventType === "step_completed") {
+              if (data.node_id) {
+                setNodes((nds) =>
+                  nds.map((n) => (n.id === data.node_id ? { ...n, data: { ...n.data, status: "completed" } } : n))
+                );
+              }
+              refetchStepLogsRef.current();
+            } else if (eventType === "step_failed") {
+              if (data.node_id) {
+                setNodes((nds) =>
+                  nds.map((n) => (n.id === data.node_id ? { ...n, data: { ...n.data, status: "failed" } } : n))
+                );
+              }
+              refetchStepLogsRef.current();
+            } else if (eventType === "run_completed" || eventType === "run_failed") {
+              setIsRunning(false);
+              refetchExecutionsRef.current();
+              refetchStepLogsRef.current();
+              setTimeout(() => {
+                setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, status: undefined } })));
+              }, 3500);
+            }
+          } catch (e) {
+            console.error("Error handling workflow websocket message:", e);
+          }
+        };
+
+        ws.onclose = () => {
+          if (isSubscribed) {
+            reconnectTimeout = setTimeout(connectWs, 5000);
+          }
+        };
+
+        ws.onerror = (err) => {
+          console.warn("[WS] Workflow connection event:", err);
+        };
+      } catch (e) {
+        console.error("[WS] Workflow setup error:", e);
+        if (isSubscribed) {
+          reconnectTimeout = setTimeout(connectWs, 5000);
+        }
+      }
+    };
+
+    connectWs();
+
+    return () => {
+      isSubscribed = false;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) {
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onerror = null;
+        ws.onclose = null;
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      }
+    };
+  }, [workflowId]);
+
+  // Run Workflow Execution Trigger
   const handleRunWorkflow = async () => {
     setIsRunning(true);
     setIsLogsOpen(true);
@@ -390,30 +618,6 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
       });
       const runData = await res.json();
       setActiveRunId(runData.id);
-
-      // Listen via WebSocket for real-time thoughts & updates
-      const ws = new WebSocket(`${ENGINE_WS_URL}/api/v1/ws/executions/${runData.id}`);
-
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload.event === "step_start" || payload.event === "step_completed" || payload.event === "step_failed") {
-            setStepLogs((prev) => [...prev, payload]);
-            refetchStepLogs();
-          } else if (payload.event === "run_completed" || payload.event === "run_failed") {
-            setIsRunning(false);
-            ws.close();
-            refetchExecutions();
-            refetchStepLogs();
-          }
-        } catch (e) {
-          console.error("Error parsing ws message:", e);
-        }
-      };
-
-      ws.onerror = () => {
-        setIsRunning(false);
-      };
     } catch (e) {
       console.error("Execution failed:", e);
       setIsRunning(false);
@@ -593,6 +797,19 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
 
         {/* Action Controls */}
         <div className="pointer-events-auto flex items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportWorkflowJson}
+            accept=".json,application/json"
+            className="hidden"
+          />
+          <Button variant="outline" size="sm" onClick={handleExportWorkflowJson} className="gap-1.5 border-sky-500/30 hover:bg-sky-500/10 text-sky-300">
+            <Download className="h-4 w-4" /> Export JSON
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleTriggerImportClick} className="gap-1.5 border-teal-500/30 hover:bg-teal-500/10 text-teal-300">
+            <Upload className="h-4 w-4" /> Import JSON
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setIsWebhookModalOpen(true)} className="gap-2">
             <Zap className="h-4 w-4 text-amber-400" /> Webhook Secret API
           </Button>
@@ -684,10 +901,15 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
                     <SelectValue placeholder="Select node type..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="trigger">Trigger Event</SelectItem>
-                    <SelectItem value="agent">smolagent AI Agent</SelectItem>
-                    <SelectItem value="code">Python Code Block</SelectItem>
-                    <SelectItem value="http_request">HTTP Request Node</SelectItem>
+                    <SelectItem value="trigger">⚡ Trigger Event</SelectItem>
+                    <SelectItem value="agent">🤖 smolagent AI Agent</SelectItem>
+                    <SelectItem value="code">🐍 Python Code Block</SelectItem>
+                    <SelectItem value="logger">📋 Step Result Logger</SelectItem>
+                    <SelectItem value="condition">🔀 Conditional Router</SelectItem>
+                    <SelectItem value="filter">🔍 Data Filter & Mapper</SelectItem>
+                    <SelectItem value="http_request">🌐 HTTP REST API</SelectItem>
+                    <SelectItem value="database">🗄️ Database Ingestion</SelectItem>
+                    <SelectItem value="email">📧 Email Notification</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -781,13 +1003,42 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
 
               {selectedNode.data.type === "code" && (
                 <div className="space-y-2">
-                  <Label>Python Execution Code</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Python Execution Code</Label>
+                    <span className="text-[10px] text-muted-foreground font-mono">Isolated Sandbox</span>
+                  </div>
                   <textarea
                     rows={8}
                     className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-sm shadow-sm font-mono text-emerald-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     value={(selectedNode.data.code as string) || ""}
                     onChange={(e) => updateSelectedNodeData("code", e.target.value)}
+                    placeholder="log('msg')&#10;output = {'result': steps['node-1']}"
                   />
+                  <div className="rounded-lg border border-blue-500/20 bg-blue-950/20 p-3 text-[11px] text-muted-foreground space-y-1.5">
+                    <p className="text-blue-300 font-semibold flex items-center gap-1.5">
+                      <Code className="h-3.5 w-3.5" /> Sandbox Execution Environment:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 font-mono text-[11px]">
+                      <li><code className="text-emerald-400 font-bold">log("msg", val)</code> or <code className="text-emerald-400 font-bold">print(...)</code> — write to execution log trace</li>
+                      <li><code className="text-emerald-400 font-bold">steps['node_id']</code> — read data output from any previous node call</li>
+                      <li><code className="text-emerald-400 font-bold">output = ...</code> — return data payload for child nodes</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {selectedNode.data.type === "logger" && (
+                <div className="space-y-3 rounded-xl border border-teal-500/20 bg-teal-950/20 p-4">
+                  <div className="flex items-center gap-2 text-teal-300 font-semibold text-xs">
+                    <Terminal className="h-4 w-4" /> Result Logger Node
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    This tool captures and logs the execution output from all previous node calls in the graph (e.g. HTTP responses, Agent outputs, Triggers).
+                  </p>
+                  <div className="p-2.5 rounded bg-black/40 border border-teal-500/10 text-[11px] font-mono text-teal-200 space-y-1">
+                    <p className="font-semibold text-teal-300">Child Node Access:</p>
+                    <p>Downstream nodes receive: <code className="text-emerald-400">{`inputs['${selectedNode.id}']`}</code> containing <code className="text-purple-300">logged_data</code>, <code className="text-purple-300">summary</code>, and <code className="text-purple-300">count</code>.</p>
+                  </div>
                 </div>
               )}
 

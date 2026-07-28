@@ -2,12 +2,12 @@
 
 import React, { memo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
-import { Zap, Bot, Code, Globe, GitFork, Play, Database, Mail, Filter } from "lucide-react";
+import { Zap, Bot, Code, Globe, GitFork, Play, Database, Mail, Filter, Terminal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export interface CustomNodeData {
   label: string;
-  type: "trigger" | "agent" | "code" | "http_request" | "condition" | "database" | "email" | "filter" | string;
+  type: "trigger" | "agent" | "code" | "http_request" | "condition" | "database" | "email" | "filter" | "logger" | string;
   trigger_type?: string;
   prompt?: string;
   code?: string;
@@ -36,6 +36,13 @@ const nodeTypeConfig: Record<string, { label: string; icon: any; color: string; 
     color: "#60a5fa",
     bgClass: "bg-blue-950/40",
     borderClass: "border-blue-500/40 hover:border-blue-500",
+  },
+  logger: {
+    label: "Step Logger",
+    icon: Terminal,
+    color: "#2dd4bf",
+    bgClass: "bg-teal-950/40",
+    borderClass: "border-teal-500/40 hover:border-teal-500",
   },
   http_request: {
     label: "HTTP Request",

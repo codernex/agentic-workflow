@@ -15,16 +15,19 @@ class EventBroadcaster:
             self.redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         return self.redis_client
 
-    async def publish_event(self, run_id: str, event_type: str, data: Dict[str, Any]):
-        """Publish execution event to Redis pubsub channel: execution:{run_id}"""
+    async def publish_event(self, run_id: str, event_type: str, data: Dict[str, Any], workflow_id: str = None):
+        """Publish execution event to Redis pubsub channels: execution:{run_id} and workflow:{workflow_id}"""
         try:
             client = await self.get_client()
-            channel = f"execution:{run_id}"
             message = json.dumps({
                 "event": event_type,
                 "data": data
             })
-            await client.publish(channel, message)
+            await client.publish(f"execution:{run_id}", message)
+            
+            wf_id = workflow_id or data.get("workflow_id")
+            if wf_id:
+                await client.publish(f"workflow:{wf_id}", message)
         except Exception as e:
             logger.error(f"Failed to publish event for run {run_id}: {e}")
 

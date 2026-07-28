@@ -59,8 +59,8 @@ def verify_trigger_permission(
 async def _run_executor_task(workflow_run_id: str):
     """Background task to instantiate and execute a workflow run."""
     async with async_session_maker() as session:
-        executor = WorkflowExecutor(session)
-        await executor.execute(workflow_run_id)
+        executor = WorkflowExecutor(session, workflow_run_id)
+        await executor.execute()
 
 @router.post("/", response_model=WorkflowRead, status_code=status.HTTP_201_CREATED)
 async def create_workflow(

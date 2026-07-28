@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -9,7 +9,7 @@ import {
   createWorkflowApiV1WorkflowsPostMutation,
   deleteWorkflowApiV1WorkflowsWorkflowIdDeleteMutation,
 } from "@repo/api-client";
-import { Plus, ArrowUpRight, Trash2, Search, Sparkles, Loader2 } from "lucide-react";
+import { Plus, ArrowUpRight, Trash2, Search, Sparkles, Loader2, Upload } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,63 @@ export default function WorkflowsPage() {
       queryClient.invalidateQueries({ queryKey: listWorkflowsApiV1WorkflowsGetQueryKey() });
     },
   });
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleImportWorkflowFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+
+        if (!parsed || !Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) {
+          alert("Invalid workflow JSON file format. Must contain 'nodes' and 'edges' arrays.");
+          return;
+        }
+
+        const idMapping: Record<string, string> = {};
+        const cleanNodes = parsed.nodes.map((n: any, idx: number) => {
+          const newId = `node-${Date.now()}-${idx + 1}`;
+          idMapping[n.id] = newId;
+          const { status, ...cleanData } = n.data || {};
+          return {
+            id: newId,
+            type: n.type || "customNode",
+            position: n.position || { x: 250 + idx * 40, y: 150 + idx * 40 },
+            data: cleanData,
+          };
+        });
+
+        const cleanEdges = parsed.edges.map((e: any, idx: number) => ({
+          id: `edge-${Date.now()}-${idx + 1}`,
+          source: idMapping[e.source] || e.source,
+          target: idMapping[e.target] || e.target,
+          animated: e.animated ?? true,
+          style: e.style || { stroke: "#8b5cf6", strokeWidth: 2 },
+        }));
+
+        createMutation.mutate({
+          body: {
+            name: parsed.name ? `${parsed.name} (Imported)` : "Imported Workflow",
+            description: parsed.description || "Imported from JSON definition.",
+            is_active: true,
+            nodes: cleanNodes,
+            edges: cleanEdges,
+          },
+        });
+      } catch (err) {
+        console.error("Failed to parse imported workflow JSON:", err);
+        alert("Failed to parse JSON file. Please ensure it is valid JSON.");
+      }
+    };
+
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const handleCreateWorkflow = () => {
     if (!name.trim()) return;
@@ -88,12 +145,28 @@ export default function WorkflowsPage() {
           <h1 className="text-3xl font-extrabold tracking-tight">Workflows Manager</h1>
           <p className="text-sm text-muted-foreground">Create, configure, and inspect visual agentic workflows.</p>
         </div>
-        <Button
-          onClick={() => setIsCreateOpen(true)}
-          className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/20"
-        >
-          <Plus className="h-4 w-4" /> New Workflow
-        </Button>
+        <div className="flex items-center gap-3">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportWorkflowFile}
+            accept=".json,application/json"
+            className="hidden"
+          />
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            className="gap-2 border-purple-500/30 hover:bg-purple-500/10 text-purple-300"
+          >
+            <Upload className="h-4 w-4" /> Import Workflow JSON
+          </Button>
+          <Button
+            onClick={() => setIsCreateOpen(true)}
+            className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/20"
+          >
+            <Plus className="h-4 w-4" /> New Workflow
+          </Button>
+        </div>
       </div>
 
       {/* Search Bar */}

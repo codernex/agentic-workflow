@@ -22,6 +22,12 @@ BUILTIN_TOOLS = [
         "description": "Triggers execution upon receiving an inbound HTTP webhook POST."
     },
     {
+        "id": "trigger_cron",
+        "name": "Cron Scheduler",
+        "type": "cron",
+        "description": "Periodic UTC time-based trigger execution."
+    },
+    {
         "id": "agent_smolagents",
         "name": "AI Agent Node (smolagents)",
         "type": "agent",
@@ -34,10 +40,40 @@ BUILTIN_TOOLS = [
         "description": "Executes dynamic inline Python code block with access to parent node outputs."
     },
     {
+        "id": "logger_node",
+        "name": "Step Result Logger",
+        "type": "logger",
+        "description": "Captures, formats, and logs output results from all previous step calls."
+    },
+    {
+        "id": "condition_node",
+        "name": "Conditional Router",
+        "type": "condition",
+        "description": "Evaluates boolean conditions and routes workflow graph execution."
+    },
+    {
+        "id": "filter_node",
+        "name": "Data Filter & Mapper",
+        "type": "filter",
+        "description": "Transforms and projects nested JSON payloads."
+    },
+    {
         "id": "http_request",
         "name": "HTTP Request Node",
         "type": "http_request",
         "description": "Performs async REST HTTP requests (GET, POST, PUT, DELETE)."
+    },
+    {
+        "id": "database_node",
+        "name": "Database Ingestion",
+        "type": "database",
+        "description": "Queries or persists data payloads to database storage."
+    },
+    {
+        "id": "email_node",
+        "name": "Email Notification",
+        "type": "email",
+        "description": "Dispatches email alert notifications to external channels."
     }
 ]
 

@@ -65,8 +65,10 @@ class WorkflowExecutor:
             workflow_run.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
             await self.session.commit()
             await broadcaster.publish_event(self.run_id, "run_failed", {
+                "run_id": self.run_id,
+                "workflow_id": workflow.id,
                 "error": str(e)
-            })
+            }, workflow_id=workflow.id)
             return
 
         # 3. Step execution loop
@@ -100,11 +102,13 @@ class WorkflowExecutor:
             await self.session.refresh(step_log)
 
             await broadcaster.publish_event(self.run_id, "step_start", {
+                "run_id": self.run_id,
+                "workflow_id": workflow.id,
                 "step_id": step_log.id,
                 "node_id": node_id,
                 "node_name": node_name,
                 "node_type": node_type
-            })
+            }, workflow_id=workflow.id)
 
             start_time = time.time()
             try:
@@ -122,12 +126,14 @@ class WorkflowExecutor:
                 await self.session.commit()
 
                 await broadcaster.publish_event(self.run_id, "step_completed", {
+                    "run_id": self.run_id,
+                    "workflow_id": workflow.id,
                     "step_id": step_log.id,
                     "node_id": node_id,
                     "output": output,
                     "thought_trace": thought_trace,
                     "execution_time_ms": execution_time
-                })
+                }, workflow_id=workflow.id)
             except Exception as e:
                 execution_time = round((time.time() - start_time) * 1000, 2)
                 err_msg = str(e)
@@ -145,11 +151,13 @@ class WorkflowExecutor:
                 await self.session.commit()
 
                 await broadcaster.publish_event(self.run_id, "step_failed", {
+                    "run_id": self.run_id,
+                    "workflow_id": workflow.id,
                     "step_id": step_log.id,
                     "node_id": node_id,
                     "error": err_msg,
                     "traceback": trace
-                })
+                }, workflow_id=workflow.id)
                 return
 
         # 4. Workflow completion
@@ -160,8 +168,9 @@ class WorkflowExecutor:
 
         await broadcaster.publish_event(self.run_id, "run_completed", {
             "run_id": self.run_id,
+            "workflow_id": workflow.id,
             "output": workflow_run.output_data
-        })
+        }, workflow_id=workflow.id)
 
     async def _execute_node(self, node: Dict[str, Any], input_data: Dict[str, Any]):
         node_data = node.get("data", {})
@@ -192,18 +201,61 @@ class WorkflowExecutor:
 
         elif node_type == "code":
             code_snippet = node_data.get("code", "output = inputs")
-            output = await execute_sandbox_python(code_snippet, input_data)
-            return output, "Executed Python snippet in isolated process sandbox."
+            output, logs = await execute_sandbox_python(
+                code_snippet,
+                inputs=input_data,
+                steps=self.node_outputs,
+                return_logs=True
+            )
+            thought = "Executed Python snippet in isolated process sandbox."
+            if logs:
+                thought += "\n\nExecution Logs:\n" + "\n".join(logs)
+            return output, thought
 
         elif node_type == "condition":
             code_snippet = node_data.get("code") or node_data.get("condition") or "output = bool(inputs)"
-            output = await execute_sandbox_python(code_snippet, input_data)
-            return {"condition_met": bool(output), "output": output}, f"Condition evaluated to {output} in process sandbox."
+            output, logs = await execute_sandbox_python(
+                code_snippet,
+                inputs=input_data,
+                steps=self.node_outputs,
+                return_logs=True
+            )
+            thought = f"Condition evaluated to {output} in process sandbox."
+            if logs:
+                thought += "\n\nExecution Logs:\n" + "\n".join(logs)
+            return {"condition_met": bool(output), "output": output}, thought
 
         elif node_type == "filter":
             code_snippet = node_data.get("code", "output = inputs")
-            output = await execute_sandbox_python(code_snippet, input_data)
-            return output, "Filtered and transformed payload in process sandbox."
+            output, logs = await execute_sandbox_python(
+                code_snippet,
+                inputs=input_data,
+                steps=self.node_outputs,
+                return_logs=True
+            )
+            thought = "Filtered and transformed payload in process sandbox."
+            if logs:
+                thought += "\n\nExecution Logs:\n" + "\n".join(logs)
+            return output, thought
+
+        elif node_type in ("logger", "logger_node", "log_inspector"):
+            import json
+            target_nodes = node_data.get("target_nodes", [])
+            logged_results = {}
+            log_messages = []
+
+            for prev_id, prev_output in self.node_outputs.items():
+                if not target_nodes or prev_id in target_nodes:
+                    logged_results[prev_id] = prev_output
+                    log_messages.append(f"• Step [{prev_id}]: {json.dumps(prev_output, default=str)}")
+
+            summary_text = f"Logged results from {len(logged_results)} previous step(s):\n" + ("\n".join(log_messages) if log_messages else "No previous steps found.")
+            output = {
+                "logged_data": logged_results,
+                "summary": summary_text,
+                "count": len(logged_results)
+            }
+            return output, summary_text
 
         elif node_type == "http_request":
             url = self._interpolate_template(node_data.get("url", ""), input_data)
@@ -234,7 +286,8 @@ class WorkflowExecutor:
     def _interpolate_template(self, text: str, input_data: Dict[str, Any]) -> str:
         if not text or not isinstance(text, str):
             return text
-        for parent_id, parent_output in input_data.items():
+        combined_context = {**self.node_outputs, **input_data}
+        for parent_id, parent_output in combined_context.items():
             if isinstance(parent_output, dict):
                 for k, v in parent_output.items():
                     text = text.replace(f"{{{parent_id}.{k}}}", str(v))
