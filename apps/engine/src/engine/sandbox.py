@@ -7,6 +7,38 @@ import re
 import asyncio
 from typing import Dict, Any
 
+class RobustDict(dict):
+    """
+    Enhanced dictionary with fuzzy key resolution (hyphen <-> underscore conversion,
+    case-insensitivity, and fallback parent/data alias for single-item dicts).
+    """
+    def __getitem__(self, key):
+        if key in self:
+            return super().__getitem__(key)
+        if isinstance(key, str):
+            # 1. Hyphen <-> Underscore conversion (e.g. 'node-1' <-> 'node_1')
+            alt_key = key.replace('_', '-') if '_' in key else key.replace('-', '_')
+            if alt_key in self:
+                return super().__getitem__(alt_key)
+            
+            # 2. Case insensitive match
+            for k, v in self.items():
+                if isinstance(k, str) and k.lower() == key.lower():
+                    return v
+            
+            # 3. Convenience alias for single parent / single item dictionaries
+            if len(self) == 1 and key.lower() in ('data', 'parent', 'first', 'payload', 'output', 'result'):
+                return list(self.values())[0]
+
+        available = list(self.keys())
+        raise KeyError(f"Key '{key}' not found in inputs/steps dict. Available keys in context: {available}")
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
 def _sandbox_worker(code_snippet: str, inputs: Dict[str, Any], steps: Dict[str, Any], return_dict: Dict):
     """
     Subprocess worker executing python snippet in a restricted environment.
@@ -40,7 +72,11 @@ def _sandbox_worker(code_snippet: str, inputs: Dict[str, Any], steps: Dict[str, 
         'ValueError': ValueError, 'TypeError': TypeError, 'KeyError': KeyError, 'IndexError': IndexError
     }
 
-    steps_data = steps if isinstance(steps, dict) else {}
+    raw_inputs = inputs if isinstance(inputs, dict) else {}
+    raw_steps = steps if isinstance(steps, dict) else {}
+
+    inputs_dict = RobustDict(raw_inputs)
+    steps_dict = RobustDict(raw_steps)
 
     # Safe modules exposed to code snippet
     safe_globals = {
@@ -49,28 +85,31 @@ def _sandbox_worker(code_snippet: str, inputs: Dict[str, Any], steps: Dict[str, 
         'math': math,
         'datetime': datetime,
         're': re,
-        'inputs': inputs,
-        'input_data': inputs,
-        'steps': steps_data,
-        'previous_steps': steps_data,
-        'step_outputs': steps_data,
+        'inputs': inputs_dict,
+        'input_data': inputs_dict,
+        'steps': steps_dict,
+        'previous_steps': steps_dict,
+        'step_outputs': steps_dict,
         'log': custom_log,
         'logger': CustomLogger(),
     }
 
     # Map parent outputs, step outputs and convenient trigger aliases into globals
-    if isinstance(inputs, dict):
-        for parent_id, p_val in inputs.items():
+    for parent_id, p_val in raw_inputs.items():
+        if isinstance(parent_id, str):
             if "trigger" in parent_id.lower() or parent_id == "node-1":
                 safe_globals['trigger'] = p_val
                 safe_globals['trigger_data'] = p_val
+            clean_pid = parent_id.replace('-', '_')
+            if clean_pid.isidentifier() and clean_pid not in safe_globals:
+                safe_globals[clean_pid] = p_val
             if isinstance(p_val, dict):
                 for k, v in p_val.items():
-                    if k.isidentifier() and k not in safe_globals:
+                    if isinstance(k, str) and k.isidentifier() and k not in safe_globals:
                         safe_globals[k] = v
 
-    if isinstance(steps_data, dict):
-        for s_id, s_val in steps_data.items():
+    for s_id, s_val in raw_steps.items():
+        if isinstance(s_id, str):
             clean_id = s_id.replace('-', '_')
             if clean_id.isidentifier() and clean_id not in safe_globals:
                 safe_globals[clean_id] = s_val
@@ -95,9 +134,13 @@ def _sandbox_worker(code_snippet: str, inputs: Dict[str, Any], steps: Dict[str, 
 
         return_dict['logs'] = execution_logs
         return_dict['success'] = True
+    except KeyError as ke:
+        return_dict['logs'] = execution_logs
+        return_dict['error'] = f"KeyError: {ke}"
+        return_dict['success'] = False
     except Exception as e:
         return_dict['logs'] = execution_logs
-        return_dict['error'] = str(e)
+        return_dict['error'] = f"{type(e).__name__}: {e}"
         return_dict['success'] = False
 
 
@@ -141,4 +184,3 @@ async def execute_sandbox_python(
         return return_dict.get('output')
 
     return await loop.run_in_executor(None, run_process)
-

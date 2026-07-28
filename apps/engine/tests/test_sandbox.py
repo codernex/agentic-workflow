@@ -59,8 +59,22 @@ output = {
     "result_val": steps['node-2']['value'] * 5
 }
 """
-    result, logs = await execute_sandbox_python(code, inputs, steps=steps, return_logs=True)
-    assert result == {"user": "Alice", "result_val": 50}
+    output, logs = await execute_sandbox_python(code, inputs, steps=steps, return_logs=True)
+    assert output["user"] == "Alice"
+    assert output["result_val"] == 50
+    assert len(logs) == 2
     assert "Processing step data for Alice" in logs[0]
     assert "Calculated output value: 50" in logs[1]
 
+@pytest.mark.asyncio
+async def test_sandbox_robust_dict_fuzzy_keys():
+    inputs = {"node-1": {"status": "success", "count": 42}}
+    # Test hyphen to underscore matching: inputs['node_1'] matches 'node-1'
+    code = """
+val1 = inputs['node_1']['count']
+val2 = inputs['data']['status']
+output = {'val1': val1, 'val2': val2}
+"""
+    result = await execute_sandbox_python(code, inputs)
+    assert result['val1'] == 42
+    assert result['val2'] == "success"
