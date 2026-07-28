@@ -226,13 +226,24 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
   );
 
   const handleRegenerateSecret = async () => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     try {
       const res = await fetch(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/regenerate-secret`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("access_token")}` }
+        headers,
       });
       if (res.ok) {
-        refetchWorkflow();
+        const updatedWorkflow = await res.json();
+        queryClient.setQueryData(
+          getWorkflowApiV1WorkflowsWorkflowIdGetQueryKey({ path: { workflow_id: workflowId } }),
+          updatedWorkflow
+        );
+        await refetchWorkflow();
       }
     } catch (e) {
       console.error("Failed to regenerate webhook secret:", e);
@@ -602,20 +613,43 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
     setIsLogsOpen(true);
     setStepLogs([]);
 
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+    const secret = (workflowData as any)?.webhook_secret || "";
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
     try {
       // First save workflow graph
       await fetch(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ name: workflowName, nodes, edges }),
       });
 
-      // Trigger Execution
-      const res = await fetch(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/execute`, {
+      // Trigger Execution with Authorization header and secret parameter fallback
+      const url = secret
+        ? `${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/execute?secret=${encodeURIComponent(secret)}`
+        : `${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/execute`;
+
+      const res = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ trigger_time: new Date().toISOString() }),
       });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ detail: "Failed to execute workflow." }));
+        console.error("Execution failed response:", errData);
+        alert(errData.detail || "Failed to execute workflow.");
+        setIsRunning(false);
+        return;
+      }
+
       const runData = await res.json();
       setActiveRunId(runData.id);
     } catch (e) {
@@ -938,25 +972,26 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
 
                   {((selectedNode.data.trigger_type as string) === "webhook" || (selectedNode.data.trigger_type as string) === "manual" || !selectedNode.data.trigger_type) && (
                     <div className="space-y-2 pt-2">
-                      <Label className="text-xs text-muted-foreground">Webhook / API Endpoint URL</Label>
+                      <Label className="text-xs text-muted-foreground">Authenticated Webhook / API URL</Label>
                       <div className="flex items-center gap-2">
                         <Input
                           readOnly
                           className="font-mono text-xs text-purple-300 bg-black/40"
-                          value={`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/execute`}
+                          value={`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/webhook?secret=${(workflowData as any)?.webhook_secret || ""}`}
                         />
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => {
-                            navigator.clipboard.writeText(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/execute`);
-                            alert("Webhook URL copied to clipboard!");
+                            const url = `${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}/webhook?secret=${(workflowData as any)?.webhook_secret || ""}`;
+                            navigator.clipboard.writeText(url);
+                            alert("Authenticated Webhook URL with secret copied to clipboard!");
                           }}
                         >
                           <Copy className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                      <p className="text-[11px] text-muted-foreground">Send HTTP POST to trigger this workflow with JSON payload.</p>
+                      <p className="text-[11px] text-muted-foreground">Send HTTP POST to trigger this workflow with JSON payload and secret token.</p>
                     </div>
                   )}
 
