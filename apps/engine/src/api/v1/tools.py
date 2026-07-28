@@ -64,12 +64,6 @@ BUILTIN_TOOLS = [
         "description": "Performs async REST HTTP requests (GET, POST, PUT, DELETE)."
     },
     {
-        "id": "database_node",
-        "name": "Database Ingestion",
-        "type": "database",
-        "description": "Queries or persists data payloads to database storage."
-    },
-    {
         "id": "email_node",
         "name": "Email Notification",
         "type": "email",

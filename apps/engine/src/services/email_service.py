@@ -136,3 +136,110 @@ def send_verification_email(recipient_email: str, verification_code: str) -> boo
     except Exception as e:
         logger.error(f"Failed to send email via Mailtrap SDK: {e}")
         return False
+
+
+def generate_workflow_alert_email_html(recipient_email: str, subject: str, body: str) -> str:
+    """Generates a responsive, elegant HTML template for workflow alert notifications."""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{subject}</title>
+  <style>
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #09090b;
+      color: #f4f4f5;
+      margin: 0;
+      padding: 40px 20px;
+    }}
+    .container {{
+      max-width: 560px;
+      margin: 0 auto;
+      background: #18181b;
+      border: 1px solid rgba(168, 85, 247, 0.25);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }}
+    .header {{
+      background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+      padding: 28px 24px;
+      text-align: center;
+    }}
+    .header h1 {{
+      margin: 0;
+      font-size: 22px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+    }}
+    .content {{
+      padding: 30px 28px;
+    }}
+    .subject-banner {{
+      font-size: 16px;
+      font-weight: 700;
+      color: #c084fc;
+      margin-bottom: 16px;
+    }}
+    .body-box {{
+      background: #09090b;
+      border: 1px solid #27272a;
+      border-radius: 10px;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #e4e4e7;
+      white-space: pre-wrap;
+    }}
+    .footer {{
+      border-top: 1px solid #27272a;
+      padding: 18px 24px;
+      text-align: center;
+      font-size: 12px;
+      color: #71717a;
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>⚡ Agentic Workflow Notification</h1>
+      <p>Automated Execution Alert</p>
+    </div>
+    <div class="content">
+      <div class="subject-banner">{subject}</div>
+      <div class="body-box">{body}</div>
+    </div>
+    <div class="footer">
+      Sent by Agentic Workflow Automation Engine.
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+def send_workflow_notification_email(recipient_email: str, subject: str, body: str) -> bool:
+    """
+    Sends workflow alert notification email via Mailtrap SDK or logs mock output.
+    """
+    if not settings.MAILTRAP_API_TOKEN:
+        logger.info(f"[EMAIL NOTIFICATION MOCK] Mailtrap token not set. To: {recipient_email} | Subject: {subject} | Body: {body}")
+        return False
+
+    try:
+        client = mt.MailtrapClient(token=settings.MAILTRAP_API_TOKEN)
+        mail = mt.Mail(
+            sender=mt.Address(email=settings.SENDER_EMAIL, name=settings.SENDER_NAME),
+            to=[mt.Address(email=recipient_email)],
+            subject=subject,
+            html=generate_workflow_alert_email_html(recipient_email, subject, body),
+        )
+        client.send(mail)
+        logger.info(f"Workflow alert email successfully sent to {recipient_email}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send workflow alert email via Mailtrap SDK: {e}")
+        return False

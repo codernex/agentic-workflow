@@ -279,6 +279,28 @@ class WorkflowExecutor:
                     res_data = resp.text
                 return {"status_code": resp.status_code, "data": res_data}, f"HTTP {method} {url} returned {resp.status_code}"
 
+        elif node_type in ("email", "email_node", "mail"):
+            import datetime
+            from services.email_service import send_workflow_notification_email
+
+            to_addr = self._interpolate_template(node_data.get("to") or node_data.get("recipient") or "user@example.com", input_data)
+            subject = self._interpolate_template(node_data.get("subject") or "Workflow Event Notification", input_data)
+            body = self._interpolate_template(node_data.get("body") or "Workflow executed successfully.", input_data)
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+            delivered = send_workflow_notification_email(to_addr, subject, body)
+
+            output = {
+                "status": "delivered" if delivered else "logged_mock",
+                "to": to_addr,
+                "subject": subject,
+                "body_preview": body[:120] + ("..." if len(body) > 120 else ""),
+                "delivered_via": "Mailtrap SDK Inbox" if delivered else "Console Log Trace (Set MAILTRAP_API_TOKEN for live delivery)",
+                "sent_at": now_iso
+            }
+            thought = f"Dispatched email notification to '{to_addr}' with subject '{subject}' (Status: {'Delivered via Mailtrap SDK' if delivered else 'Captured in execution log'})."
+            return output, thought
+
         else:
             # Fallback generic node
             return {"input": input_data, "message": f"Processed by node type '{node_type}'"}, "Generic node executed."

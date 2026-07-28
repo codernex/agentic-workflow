@@ -354,7 +354,6 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
       category: "Integrations & Alerts",
       items: [
         { type: "http_request", label: "HTTP REST API", url: "https://api.github.com/zen", method: "GET", desc: "REST HTTP call (GET/POST/PUT/DELETE).", icon: Globe, color: "text-emerald-400" },
-        { type: "database", label: "Database Ingestion", desc: "Queries or writes data to database store.", icon: Database, color: "text-sky-400" },
         { type: "email", label: "Email Alert Notification", desc: "Dispatches email alert via webhook/SMTP.", icon: Mail, color: "text-rose-400" },
       ],
     },
@@ -942,7 +941,6 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
                     <SelectItem value="condition">🔀 Conditional Router</SelectItem>
                     <SelectItem value="filter">🔍 Data Filter & Mapper</SelectItem>
                     <SelectItem value="http_request">🌐 HTTP REST API</SelectItem>
-                    <SelectItem value="database">🗄️ Database Ingestion</SelectItem>
                     <SelectItem value="email">📧 Email Notification</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1121,6 +1119,61 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
                       }}
                       placeholder='{\n  "email": "{node-1.user_email}"\n}'
                     />
+                  </div>
+                </div>
+              )}
+
+              {selectedNode.data.type === "email" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Recipient Email (To)</Label>
+                    <Input
+                      value={(selectedNode.data.to as string) || ""}
+                      onChange={(e) => updateSelectedNodeData("to", e.target.value)}
+                      placeholder="e.g. user@example.com or {node-1.email}"
+                    />
+                    <p className="text-[11px] text-muted-foreground">Use template syntax <code className="text-purple-300 font-mono">{`{node-1.email}`}</code> to bind recipient from a parent node.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Subject Line</Label>
+                    <Input
+                      value={(selectedNode.data.subject as string) || ""}
+                      onChange={(e) => updateSelectedNodeData("subject", e.target.value)}
+                      placeholder="e.g. Alert: {node-1.status_code} - {node-2.status}"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email Body Message</Label>
+                    <textarea
+                      rows={4}
+                      className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-xs font-mono text-purple-200"
+                      value={(selectedNode.data.body as string) || ""}
+                      onChange={(e) => updateSelectedNodeData("body", e.target.value)}
+                      placeholder="Hello {node-1.user_name}, your request processed with summary: {node-2.summary}"
+                    />
+                  </div>
+
+                  {/* Parent Data Binding Examples Card */}
+                  <div className="p-3.5 rounded-xl border border-purple-500/20 bg-purple-950/20 text-xs space-y-2 text-purple-200">
+                    <p className="font-bold text-purple-300 flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4 shrink-0 text-purple-400" /> Parent Node Data Binding Examples:
+                    </p>
+                    <div className="space-y-1.5 text-[11px] font-mono bg-black/40 p-2.5 rounded border border-purple-500/10">
+                      <p><span className="text-muted-foreground">From Trigger:</span> <code className="text-emerald-400">{`To: {node-1.email}`}</code></p>
+                      <p><span className="text-muted-foreground">From Python Code:</span> <code className="text-emerald-400">{`Subject: {node-2.subject_line}`}</code></p>
+                      <p><span className="text-muted-foreground">From HTTP Request:</span> <code className="text-emerald-400">{`Body: User ID {node-3.data.id} result`}</code></p>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl border border-pink-500/20 bg-pink-950/20 text-xs space-y-2 text-pink-200">
+                    <p className="font-bold text-pink-300 flex items-center gap-1.5">
+                      <Mail className="h-4 w-4 shrink-0 text-pink-400" /> How Notifications Are Delivered:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-[11px] text-muted-foreground leading-relaxed font-sans">
+                      <li>Rendered as responsive HTML email templates with gradient header banners.</li>
+                      <li>Dispatched directly to the recipient’s inbox (<code className="text-pink-300">To</code>) via official <strong>Mailtrap Python SDK</strong>.</li>
+                      <li>If <code className="text-purple-300 font-mono">MAILTRAP_API_TOKEN</code> is unconfigured, full email payloads are captured into execution logs.</li>
+                    </ul>
                   </div>
                 </div>
               )}
