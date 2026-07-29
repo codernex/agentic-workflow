@@ -1,18 +1,27 @@
 "use client";
 
 import React, { memo } from "react";
-import { Handle, Position, NodeProps } from "@xyflow/react";
-import { Zap, Bot, Code, Globe, GitFork, Play, Database, Mail, Filter, Terminal } from "lucide-react";
+import { Handle, Position, NodeProps, useReactFlow } from "@xyflow/react";
+import { Zap, Bot, Code, Globe, GitFork, Play, Database, Mail, Filter, Terminal, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export interface CustomNodeData {
   label: string;
-  type: "trigger" | "agent" | "code" | "http_request" | "condition" | "database" | "email" | "filter" | "logger" | string;
+  type: "trigger" | "agent" | "agent_custom" | "code" | "http_request" | "condition" | "database" | "email" | "filter" | "logger";
   trigger_type?: string;
   prompt?: string;
   code?: string;
   url?: string;
   status?: "pending" | "running" | "completed" | "failed";
+  hasLeftTarget?: boolean;
+  hasLeftSource?: boolean;
+  hasRightSource?: boolean;
+  isTool?: boolean;
+  tool_name?: string;
+  tool_description?: string;
+  input_schema?: string;
+  output_schema?: string;
+  onDelete?: (id: string) => void;
 }
 
 const nodeTypeConfig: Record<string, { label: string; icon: any; color: string; bgClass: string; borderClass: string }> = {
@@ -27,6 +36,13 @@ const nodeTypeConfig: Record<string, { label: string; icon: any; color: string; 
     label: "smolagent AI",
     icon: Bot,
     color: "#f472b6",
+    bgClass: "bg-pink-950/40",
+    borderClass: "border-pink-500/40 hover:border-pink-500",
+  },
+  agent_custom: {
+    label: "Custom Agent",
+    icon: Bot,
+    color: "#ec4899",
     bgClass: "bg-pink-950/40",
     borderClass: "border-pink-500/40 hover:border-pink-500",
   },
@@ -81,8 +97,16 @@ const nodeTypeConfig: Record<string, { label: string; icon: any; color: string; 
   },
 };
 
-export const CustomCanvasNode = memo(({ data, selected }: NodeProps) => {
+export type NodeType = CustomNodeData["type"];
+// Special node types that sit on left and connect via right handle
+export const SPECIAL_LEFT_NODE_TYPES: NodeType[] = ["http_request", "logger", "email"];
+// Special node types that sit on right and accept connections via left handle
+export const SPECIAL_RIGHT_NODE_TYPES: NodeType[] = ["agent_custom"];
+
+export const CustomCanvasNode = memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as unknown as CustomNodeData;
+  const { deleteElements } = useReactFlow();
+
   const config = nodeTypeConfig[nodeData.type] || {
     label: nodeData.type || "Node",
     icon: Play,
@@ -92,18 +116,41 @@ export const CustomCanvasNode = memo(({ data, selected }: NodeProps) => {
   };
   const Icon = config.icon;
 
+  const isSpecialLeftNode = SPECIAL_LEFT_NODE_TYPES.includes(nodeData.type);
+  const isSpecialRightNode = SPECIAL_RIGHT_NODE_TYPES.includes(nodeData.type);
+
+  const handleDeleteNode = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (nodeData.onDelete) {
+      nodeData.onDelete(id);
+    } else {
+      deleteElements({ nodes: [{ id }] });
+    }
+  };
+
   return (
     <div
-      className={`relative min-w-[240px] rounded-xl border p-4 shadow-xl backdrop-blur-md transition-all duration-200 ${config.bgClass} ${config.borderClass} ${
+      className={`relative min-w-[240px] rounded-xl border p-4 shadow-xl backdrop-blur-md transition-all duration-200 max-w-md ${config.bgClass} ${config.borderClass} ${
         selected ? "ring-2 ring-purple-500 shadow-purple-500/20" : ""
       }`}
     >
-      {/* Target Handle (Input) */}
-      {nodeData.type !== "trigger" && (
+      {/* Target Handle (Input) - Top (Hidden if acting as a Tool node) */}
+      {nodeData.type !== "trigger" && !nodeData.isTool && (
         <Handle
           type="target"
           position={Position.Top}
+          id="target-top"
           className="!h-3 !w-3 !border-2 !border-background !bg-purple-400"
+        />
+      )}
+
+      {/* Target Handle (Input) - Left side (For special right nodes like agent_custom) */}
+      {(isSpecialRightNode || nodeData.hasLeftTarget) && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="target-left"
+          className="!h-3 !w-3 !border-2 !border-background !bg-pink-400"
         />
       )}
 
@@ -124,23 +171,44 @@ export const CustomCanvasNode = memo(({ data, selected }: NodeProps) => {
           </div>
         </div>
 
-        {/* Execution status indicator if running/completed */}
-        {nodeData.status && (
-          <Badge
-            variant="outline"
-            className={`text-[10px] uppercase font-mono ${
-              nodeData.status === "completed"
-                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                : nodeData.status === "running"
-                ? "bg-purple-500/20 text-purple-300 border-purple-500/30 animate-pulse"
-                : nodeData.status === "failed"
-                ? "bg-rose-500/20 text-rose-300 border-rose-500/30"
-                : "bg-neutral-800 text-neutral-400"
-            }`}
+        <div className="flex items-center gap-1.5">
+          {/* Tool Badge indicator */}
+          {nodeData.isTool && (
+            <Badge
+              variant="outline"
+              className="bg-pink-500/20 text-pink-300 border-pink-500/30 text-[10px] uppercase font-mono"
+            >
+              Tool
+            </Badge>
+          )}
+
+          {/* Execution status indicator if running/completed */}
+          {nodeData.status && (
+            <Badge
+              variant="outline"
+              className={`text-[10px] uppercase font-mono ${
+                nodeData.status === "completed"
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                  : nodeData.status === "running"
+                  ? "bg-purple-500/20 text-purple-300 border-purple-500/30 animate-pulse"
+                  : nodeData.status === "failed"
+                  ? "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                  : "bg-neutral-800 text-neutral-400"
+              }`}
+            >
+              {nodeData.status}
+            </Badge>
+          )}
+
+          {/* Delete Node Button */}
+          <button
+            onClick={handleDeleteNode}
+            title="Delete node"
+            className="p-1 rounded-md text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
           >
-            {nodeData.status}
-          </Badge>
-        )}
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Body Content Details */}
@@ -159,14 +227,40 @@ export const CustomCanvasNode = memo(({ data, selected }: NodeProps) => {
             {nodeData.code}
           </p>
         )}
+
+        {/* Tool Specification Box (When node is acting as an Agent Tool) */}
+        {nodeData.isTool && (
+          <div className="mt-2 p-2.5 rounded-lg bg-pink-950/40 border border-pink-500/30 text-[10px] space-y-1 font-mono shadow-inner">
+            <div className="text-pink-300 font-semibold truncate">
+              Tool Name: <span className="text-white">{nodeData.tool_name || nodeData.type + "_tool"}</span>
+            </div>
+            <p className="text-muted-foreground truncate">
+              <span className="text-pink-400 font-medium">Accepts:</span> {nodeData.input_schema || "parameters, payload"}
+            </p>
+            <p className="text-muted-foreground truncate">
+              <span className="text-emerald-400 font-medium">Returns:</span> {nodeData.output_schema || "result, observation"}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Source Handle (Output) */}
+      {/* Source Handle (Output) - Bottom */}
       <Handle
         type="source"
         position={Position.Bottom}
+        id="source-bottom"
         className="!h-3 !w-3 !border-2 !border-background !bg-purple-400"
       />
+
+      {/* Source Handle (Output) - Right side (For special left nodes like http_request, logger, email) */}
+      {(isSpecialLeftNode || nodeData.hasRightSource) && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="source-right"
+          className="!h-3 !w-3 !border-2 !border-background !bg-pink-400"
+        />
+      )}
     </div>
   );
 });

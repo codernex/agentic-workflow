@@ -68,6 +68,12 @@ BUILTIN_TOOLS = [
         "name": "Email Notification",
         "type": "email",
         "description": "Dispatches email alert notifications to external channels."
+    },
+    {
+        "id": "agent_custom",
+        "name": "AI Agent Node (custom)",
+        "type": "agent",
+        "description": "Dynamic reasoning agent execution loop using OpenAI GPT model."
     }
 ]
 

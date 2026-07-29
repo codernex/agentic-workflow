@@ -11,7 +11,7 @@ from models.execution import WorkflowRun, StepLog, ExecutionStatus
 from models.workflow import Workflow
 from engine.graph import WorkflowGraph
 from engine.broadcaster import broadcaster
-from engine.agent import run_smolagent
+from engine.agent import run_smolagent, HttpRequestTool, StepLoggerTool, EmailAlertTool
 
 from engine.sandbox import execute_sandbox_python
 
@@ -24,6 +24,58 @@ class WorkflowExecutor:
         self.session = session
         self.run_id = run_id
         self.node_outputs: Dict[str, Any] = {}
+
+    def _build_dynamic_tools_for_agent(self, agent_node_id: str, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]) -> List[Any]:
+        """Dynamically builds smolagents Tools for all nodes connected as tools to this agent."""
+        connected_tools = []
+        node_map = {n.get("id"): n for n in nodes}
+
+        tool_edges = [
+            e for e in edges
+            if e.get("target") == agent_node_id or e.get("targetHandle") == "target-left"
+        ]
+
+        for edge in tool_edges:
+            source_id = edge.get("source")
+            source_node = node_map.get(source_id)
+            if not source_node:
+                continue
+
+            n_data = source_node.get("data", {})
+            n_type = n_data.get("type", "unknown")
+
+            clean_id = source_id.replace("-", "_")
+            tool_name = n_data.get("tool_name") or f"{n_type}_{clean_id}"
+            tool_name = "".join(c if c.isalnum() or c == "_" else "_" for c in tool_name)
+            tool_desc = n_data.get("tool_description") or f"Executes {n_data.get('label', n_type)} action and returns observation output"
+
+            if n_type == "http_request":
+                url = n_data.get("url", "https://api.github.com/zen")
+                method = n_data.get("method", "GET")
+                tool = HttpRequestTool(
+                    name=tool_name,
+                    description=tool_desc,
+                    url=url,
+                    method=method
+                )
+                connected_tools.append(tool)
+
+            elif n_type == "logger":
+                tool = StepLoggerTool(
+                    name=tool_name,
+                    description=tool_desc
+                )
+                connected_tools.append(tool)
+
+            elif n_type == "email":
+                desc = n_data.get("tool_description") or "Dispatches email alert notifications. IMPORTANT: You MUST verify recipient email, subject, and message content for correctness before calling."
+                tool = EmailAlertTool(
+                    name=tool_name,
+                    description=desc
+                )
+                connected_tools.append(tool)
+
+        return connected_tools
 
     async def execute(self):
         # 1. Fetch WorkflowRun and Workflow
@@ -112,7 +164,7 @@ class WorkflowExecutor:
 
             start_time = time.time()
             try:
-                output, thought_trace = await self._execute_node(node, input_data)
+                output, thought_trace = await self._execute_node(node, input_data, workflow.nodes, workflow.edges)
                 output = self._filter_node_output(node, output)
                 execution_time = round((time.time() - start_time) * 1000, 2)
 
@@ -172,9 +224,12 @@ class WorkflowExecutor:
             "output": workflow_run.output_data
         }, workflow_id=workflow.id)
 
-    async def _execute_node(self, node: Dict[str, Any], input_data: Dict[str, Any]):
+    async def _execute_node(self, node: Dict[str, Any], input_data: Dict[str, Any], workflow_nodes: List[Dict[str, Any]] = None, workflow_edges: List[Dict[str, Any]] = None):
+        node_id = node.get("id", "")
         node_data = node.get("data", {})
         node_type = node_data.get("type") or node.get("type", "generic")
+        workflow_nodes = workflow_nodes or []
+        workflow_edges = workflow_edges or []
 
         if node_type == "trigger" or node_type == "webhook":
             default_payload = node_data.get("default_payload") or node_data.get("payload")
@@ -191,12 +246,37 @@ class WorkflowExecutor:
                 return default_payload, "Trigger ingested configured payload."
             return input_data, f"Trigger ingested payload ({node_data.get('trigger_type', 'manual')})."
 
-        elif node_type == "agent":
+        elif node_type in ("agent", "agent_custom"):
             raw_prompt = node_data.get("prompt", "Analyze the input payload and execute the requested task.")
             interpolated_prompt = self._interpolate_template(raw_prompt, input_data)
+
+            # Extract user prompt or query dynamically from input_data payload
+            user_prompt = ""
+            if isinstance(input_data, dict):
+                user_prompt = (
+                    input_data.get("user_prompt")
+                    or input_data.get("prompt")
+                    or input_data.get("user_input")
+                    or input_data.get("query")
+                    or ""
+                )
+
+            # Dynamically build tools connected to this agent node
+            dynamic_tools = self._build_dynamic_tools_for_agent(node_id, workflow_nodes, workflow_edges)
+
             import json
-            formatted_prompt = f"{interpolated_prompt}\n\nFull Upstream Trigger & Context Data:\n{json.dumps(input_data, indent=2, default=str)}"
-            agent_result = await run_smolagent(prompt=formatted_prompt)
+            formatted_prompt = f"AGENT SYSTEM INSTRUCTIONS:\n{interpolated_prompt}"
+
+            if user_prompt and str(user_prompt) not in interpolated_prompt:
+                formatted_prompt += f"\n\nUSER PROMPT / TASK:\n{user_prompt}"
+
+            formatted_prompt += f"\n\nFull Upstream Trigger & Context Data:\n{json.dumps(input_data, indent=2, default=str)}"
+
+            if dynamic_tools:
+                tool_names = ", ".join(t.name for t in dynamic_tools)
+                formatted_prompt += f"\n\nAvailable Tools Connected to You:\n{tool_names}\nYou can invoke these tools during your reasoning loop to obtain observations and perform actions."
+
+            agent_result = await run_smolagent(prompt=formatted_prompt, tools=dynamic_tools)
             return agent_result.output, agent_result.thought_trace
 
         elif node_type == "code":
