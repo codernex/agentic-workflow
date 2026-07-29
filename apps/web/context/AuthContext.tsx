@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { client } from "@repo/api-client";
-import { ENGINE_BASE_URL } from "@/lib/api";
+import { ENGINE_BASE_URL, getBaseUrl } from "@/lib/api";
 
 export interface UserProfile {
   id: string;
@@ -35,19 +35,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Configure bearer token header on openapi client and sync cookie for middleware
   const setAuthToken = (newToken: string | null) => {
+    const baseUrl = getBaseUrl();
     setToken(newToken);
     if (newToken) {
       localStorage.setItem("access_token", newToken);
       document.cookie = `access_token=${newToken}; path=/; max-age=86400; SameSite=Lax`;
       client.setConfig({
-        baseUrl: ENGINE_BASE_URL,
+        baseUrl,
         headers: { Authorization: `Bearer ${newToken}` },
       });
     } else {
       localStorage.removeItem("access_token");
       document.cookie = "access_token=; path=/; max-age=0;";
       client.setConfig({
-        baseUrl: ENGINE_BASE_URL,
+        baseUrl,
         headers: {},
       });
     }
@@ -63,7 +64,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       setAuthToken(savedToken);
-      const res = await fetch(`${ENGINE_BASE_URL}/api/v1/auth/me`, {
+      const baseUrl = getBaseUrl();
+      const res = await fetch(`${baseUrl}/api/v1/auth/me`, {
         headers: { Authorization: `Bearer ${savedToken}` },
       });
       if (res.ok) {
@@ -86,7 +88,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<UserProfile> => {
-    const res = await fetch(`${ENGINE_BASE_URL}/api/v1/auth/login`, {
+    const baseUrl = getBaseUrl();
+    const res = await fetch(`${baseUrl}/api/v1/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -104,7 +107,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (email: string, password: string, fullName?: string): Promise<UserProfile> => {
-    const res = await fetch(`${ENGINE_BASE_URL}/api/v1/auth/register`, {
+    const baseUrl = getBaseUrl();
+    const res = await fetch(`${baseUrl}/api/v1/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, full_name: fullName }),
@@ -119,7 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const verifyEmail = async (email: string, verificationToken: string): Promise<UserProfile> => {
-    const res = await fetch(`${ENGINE_BASE_URL}/api/v1/auth/verify-email`, {
+    const baseUrl = getBaseUrl();
+    const res = await fetch(`${baseUrl}/api/v1/auth/verify-email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, token: verificationToken }),
@@ -134,7 +139,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resendVerificationCode = async (email: string): Promise<void> => {
-    const res = await fetch(`${ENGINE_BASE_URL}/api/v1/auth/resend-code`, {
+    const baseUrl = getBaseUrl();
+    const res = await fetch(`${baseUrl}/api/v1/auth/resend-code`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),

@@ -71,7 +71,7 @@ function LoginFormContent() {
 
     try {
       await login(email, password);
-      router.push(redirectTarget);
+      window.location.href = redirectTarget;
     } catch (err: any) {
       if (err.message && err.message.toLowerCase().includes("not verified")) {
         setError("Your email address is not verified yet. Enter your verification code below.");
