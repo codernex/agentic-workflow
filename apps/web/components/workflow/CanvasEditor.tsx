@@ -117,8 +117,10 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
       id: edge.id,
       source: edge.source,
       target: edge.target,
+      sourceHandle: edge.sourceHandle || undefined,
+      targetHandle: edge.targetHandle || undefined,
       animated: edge.animated ?? true,
-      style: edge.style || { stroke: "#8b5cf6", strokeWidth: 2 },
+      style: edge.style || { stroke: edge.sourceHandle === "source-right" || edge.targetHandle === "target-left" ? "#ec4899" : "#8b5cf6", strokeWidth: 2 },
     }));
 
     const exportData = {
@@ -182,8 +184,10 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
           id: `edge-${Date.now()}-${idx + 1}`,
           source: idMapping[e.source] || e.source,
           target: idMapping[e.target] || e.target,
+          sourceHandle: e.sourceHandle || undefined,
+          targetHandle: e.targetHandle || undefined,
           animated: e.animated ?? true,
-          style: e.style || { stroke: "#8b5cf6", strokeWidth: 2 },
+          style: e.style || (e.sourceHandle === "source-right" || e.targetHandle === "target-left" ? { stroke: "#ec4899", strokeWidth: 2 } : { stroke: "#8b5cf6", strokeWidth: 2 }),
         }));
 
         setNodes(importedNodes);
@@ -589,13 +593,18 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
     setIsSaving(true);
     setSaveSuccess(false);
     try {
+      const cleanEdges = edges.map((edge) => ({
+        ...edge,
+        sourceHandle: edge.sourceHandle || undefined,
+        targetHandle: edge.targetHandle || undefined,
+      }));
       const response = await fetch(`${ENGINE_BASE_URL}/api/v1/workflows/${workflowId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: workflowName,
           nodes: nodes,
-          edges: edges,
+          edges: cleanEdges,
         }),
       });
       if (response.ok) {
