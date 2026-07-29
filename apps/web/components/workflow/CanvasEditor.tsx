@@ -894,7 +894,7 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
 
       <div className="relative flex-1 h-full overflow-hidden">
         {/* Top Floating Control Bar */}
-        <div className="absolute top-4 left-6 right-6 z-10 flex items-center justify-between pointer-events-none">
+        <div className="absolute top-4 left-6 right-6 z-40 flex items-center justify-between pointer-events-none">
           {/* Toggle Sidebar & Quick Node Palette */}
           <div className="pointer-events-auto flex items-center gap-1.5 p-1.5 rounded-xl border bg-background/90 backdrop-blur-md shadow-2xl">
             <Button
@@ -941,7 +941,7 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
           </div>
 
           {/* Action Controls */}
-          <div className="pointer-events-auto flex items-center gap-2">
+          <div className="pointer-events-auto flex items-center gap-2 p-1.5 rounded-xl border bg-background/90 backdrop-blur-md shadow-2xl">
             <input
               type="file"
               ref={fileInputRef}
@@ -949,31 +949,31 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
               accept=".json,application/json"
               className="hidden"
             />
-            <Button variant="outline" size="sm" onClick={handleExportWorkflowJson} className="gap-1.5 border-sky-500/30 hover:bg-sky-500/10 text-sky-300">
-              <Download className="h-4 w-4" /> Export JSON
+            <Button variant="outline" size="sm" onClick={handleExportWorkflowJson} className="gap-1.5 border-sky-500/30 hover:bg-sky-500/10 text-sky-300 text-xs">
+              <Download className="h-3.5 w-3.5" /> Export JSON
             </Button>
-            <Button variant="outline" size="sm" onClick={handleTriggerImportClick} className="gap-1.5 border-teal-500/30 hover:bg-teal-500/10 text-teal-300">
-              <Upload className="h-4 w-4" /> Import JSON
+            <Button variant="outline" size="sm" onClick={handleTriggerImportClick} className="gap-1.5 border-teal-500/30 hover:bg-teal-500/10 text-teal-300 text-xs">
+              <Upload className="h-3.5 w-3.5" /> Import JSON
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsWebhookModalOpen(true)} className="gap-2">
-              <Zap className="h-4 w-4 text-amber-400" /> Webhook Secret API
+            <Button variant="outline" size="sm" onClick={() => setIsWebhookModalOpen(true)} className="gap-1.5 text-xs">
+              <Zap className="h-3.5 w-3.5 text-amber-400" /> Webhook Secret API
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setIsLogsOpen(!isLogsOpen)} className="gap-2">
-              <Terminal className="h-4 w-4 text-purple-400" /> Execution Logs
+            <Button variant="outline" size="sm" onClick={() => setIsLogsOpen(!isLogsOpen)} className="gap-1.5 text-xs">
+              <Terminal className="h-3.5 w-3.5 text-purple-400" /> Execution Logs
             </Button>
             <Button
               variant="secondary"
               size="sm"
               onClick={handleSaveWorkflow}
               disabled={isSaving}
-              className="gap-2 font-medium transition-all"
+              className="gap-1.5 font-medium transition-all text-xs"
             >
               {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-400" />
               ) : saveSuccess ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
               ) : (
-                <Save className="h-4 w-4" />
+                <Save className="h-3.5 w-3.5" />
               )}
               {isSaving ? "Saving..." : saveSuccess ? "Saved!" : "Save"}
             </Button>
@@ -981,9 +981,9 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
               size="sm"
               onClick={handleRunWorkflow}
               disabled={isRunning}
-              className="gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/20"
+              className="gap-1.5 text-xs bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg shadow-purple-500/20"
             >
-              {isRunning ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />}
+              {isRunning ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5 fill-current" />}
               {isRunning ? "Running..." : "Test Execute"}
             </Button>
           </div>
