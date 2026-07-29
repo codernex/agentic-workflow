@@ -131,6 +131,11 @@ class WorkflowExecutor:
             node_name = node_data.get("label", node_id)
             node_type = node_data.get("type") or node.get("type", "generic")
 
+            # Skip dedicated tool nodes from running as standalone steps
+            if graph.is_tool_node(node_id):
+                logger.info(f"Skipping tool node '{node_name}' ({node_id}) from standalone step execution loop.")
+                continue
+
             # Collect inputs from parent nodes or initial trigger payload
             parent_ids = graph.get_parent_nodes(node_id)
             input_data = {}
