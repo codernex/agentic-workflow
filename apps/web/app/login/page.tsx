@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Bot, Sparkles, Mail, Lock, User as UserIcon, KeyRound, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -11,9 +11,12 @@ import { Label } from "@/components/ui/label";
 
 type AuthMode = "login" | "register" | "verify";
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
-  const { login, register, verifyEmail, resendVerificationCode, user } = useAuth();
+  const searchParams = useSearchParams();
+  const { login, register, verifyEmail, resendVerificationCode, user, isLoading: isAuthLoading } = useAuth();
+
+  const redirectTarget = searchParams.get("redirect") || "/workflows";
 
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
@@ -32,6 +35,13 @@ export default function LoginPage() {
       return () => clearTimeout(timer);
     }
   }, [resendCooldown]);
+
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (!isAuthLoading && user && mode !== "verify") {
+      router.push(redirectTarget);
+    }
+  }, [isAuthLoading, user, mode, router, redirectTarget]);
 
   const handleResendCode = async () => {
     if (!email) {
@@ -53,11 +63,6 @@ export default function LoginPage() {
     }
   };
 
-  // Redirect if user is already authenticated
-  if (user && mode !== "verify") {
-    router.push("/workflows");
-  }
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -66,7 +71,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.push("/workflows");
+      router.push(redirectTarget);
     } catch (err: any) {
       if (err.message && err.message.toLowerCase().includes("not verified")) {
         setError("Your email address is not verified yet. Enter your verification code below.");
@@ -342,5 +347,22 @@ export default function LoginPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground space-y-4">
+          <div className="p-4 rounded-full bg-purple-500/10 border border-purple-500/20 animate-pulse">
+            <Loader2 className="h-8 w-8 text-purple-400 animate-spin" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">Loading session...</p>
+        </div>
+      }
+    >
+      <LoginFormContent />
+    </Suspense>
   );
 }

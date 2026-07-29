@@ -4,8 +4,7 @@ export const PROTECTED_ROUTES = ["/dashboard", "/workflows", "/credentials", "/t
 export const AUTH_ROUTES = ["/login"];
 
 /**
- * Next.js 16 Proxy Convention
- * Replaces deprecated middleware.ts for server-side route guarding.
+ * Next.js 16 Proxy Convention for Server-Side Route Guarding & Instant Auth Redirects
  */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -23,9 +22,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect authenticated users trying to access login page
+  // Redirect authenticated users trying to access login page to workflows
   if (isAuthRoute && token) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/workflows", request.url));
   }
 
   return NextResponse.next();
