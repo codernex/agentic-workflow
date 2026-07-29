@@ -1,11 +1,15 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from config import settings
 from db.session import init_db
 from api.v1 import api_v1_router
 from engine.broadcaster import broadcaster
+from core.limiter import limiter
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,6 +26,18 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan
 )
+
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "detail": f"Rate limit exceeded ({exc.detail}). Please wait before making further requests."
+        },
+        headers={"Retry-After": "60"}
+    )
 
 # Enable CORS for Next.js frontend (apps/web)
 app.add_middleware(

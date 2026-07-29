@@ -1,9 +1,11 @@
 import random
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Request, status, BackgroundTasks
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import settings
+from core.limiter import limiter
 from db.session import get_async_session
 from models.user import User, UserCreate, UserRead, UserLogin, UserVerify, UserResendCode, Token
 from auth.security import get_password_hash, verify_password, create_access_token, get_current_user
@@ -12,7 +14,9 @@ from services.email_service import send_verification_email
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit(settings.AUTH_RATE_LIMIT)
 async def register_user(
+    request: Request,
     user_in: UserCreate,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_async_session)
@@ -47,7 +51,9 @@ async def register_user(
 
 
 @router.post("/verify-email", response_model=UserRead)
+@limiter.limit(settings.AUTH_RATE_LIMIT)
 async def verify_email(
+    request: Request,
     verify_in: UserVerify,
     session: AsyncSession = Depends(get_async_session)
 ):
@@ -75,7 +81,9 @@ async def verify_email(
 
 
 @router.post("/resend-code")
+@limiter.limit(settings.AUTH_RATE_LIMIT)
 async def resend_verification_code(
+    request: Request,
     resend_in: UserResendCode,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_async_session)
@@ -103,7 +111,9 @@ async def resend_verification_code(
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit(settings.AUTH_RATE_LIMIT)
 async def login(
+    request: Request,
     login_in: UserLogin,
     session: AsyncSession = Depends(get_async_session)
 ):
@@ -129,6 +139,11 @@ async def login(
 
 
 @router.get("/me", response_model=UserRead)
-async def get_me(current_user: User = Depends(get_current_user)):
+@limiter.limit(settings.GENERAL_RATE_LIMIT)
+async def get_me(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
     """Returns profile information for the authenticated user."""
     return current_user
+

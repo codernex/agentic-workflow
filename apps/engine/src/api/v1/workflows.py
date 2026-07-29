@@ -1,11 +1,12 @@
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks, status, Header, Query
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import settings
+from core.limiter import limiter
 from db.session import get_async_session, async_session_maker
 from models.workflow import Workflow, WorkflowCreate, WorkflowUpdate, WorkflowRead, generate_webhook_secret
 from models.execution import WorkflowRun, WorkflowRunRead, ExecutionStatus
@@ -159,7 +160,9 @@ async def regenerate_webhook_secret(
     return workflow
 
 @router.post("/{workflow_id}/execute", response_model=WorkflowRunRead)
+@limiter.limit(settings.EXECUTION_RATE_LIMIT)
 async def execute_workflow(
+    request: Request,
     workflow_id: str,
     background_tasks: BackgroundTasks,
     payload: Dict[str, Any] = {},
@@ -190,7 +193,9 @@ async def execute_workflow(
 
 @router.post("/webhooks/{workflow_id}", response_model=WorkflowRunRead)
 @router.post("/{workflow_id}/webhook", response_model=WorkflowRunRead)
+@limiter.limit(settings.WEBHOOK_RATE_LIMIT)
 async def handle_webhook_trigger(
+    request: Request,
     workflow_id: str,
     background_tasks: BackgroundTasks,
     payload: Dict[str, Any] = {},

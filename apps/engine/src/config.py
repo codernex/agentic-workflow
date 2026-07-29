@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     SENDER_EMAIL: str = "no-reply@codernex.dev"
     SENDER_NAME: str = "Agentic Workflow Team"
 
+    # Rate Limiting Settings
+    RATE_LIMIT_ENABLED: bool = True
+    AUTH_RATE_LIMIT: str = "10/minute"
+    GENERAL_RATE_LIMIT: str = "20/minute"
+    EXECUTION_RATE_LIMIT: str = "60/minute"
+    WEBHOOK_RATE_LIMIT: str = "60/minute"
+
     OPENROUTER_API_KEY: str = ""
     OPENROUTER_MODEL: str = "openai/gpt-4o"
     SUPERMEMORY_API_KEY: str = ""
