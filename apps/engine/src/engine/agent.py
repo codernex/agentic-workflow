@@ -219,7 +219,7 @@ async def run_agent(
     elif "nvidia" in used_base_url.lower():
         used_model = "deepseek-ai/deepseek-r1"
     else:
-        used_model = settings.OPENROUTER_MODEL or "deepseek-ai/deepseek-r1"
+        used_model = settings.OPENAI_MODEL or "deepseek-ai/deepseek-r1"
 
     if not used_key:
         err_msg = "API key is not configured. Please set OPENAI_API_KEY or OPENROUTER_API_KEY in your environment."

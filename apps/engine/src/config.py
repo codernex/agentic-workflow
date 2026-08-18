@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     WEBHOOK_RATE_LIMIT: str = "60/minute"
 
     OPENROUTER_API_KEY: str = ""
-    OPENROUTER_MODEL: str = "openai/gpt-4o"
+    OPENAI_MODEL: str = "openai/gpt-4o"
     SUPERMEMORY_API_KEY: str = ""
 
     OPENAI_API_KEY: str = ""
