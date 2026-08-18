@@ -29,9 +29,9 @@ BUILTIN_TOOLS = [
     },
     {
         "id": "agent_smolagents",
-        "name": "AI Agent Node (smolagents)",
+        "name": "AI Agent Node (LangChain / LangGraph)",
         "type": "agent",
-        "description": "Dynamic reasoning agent execution loop using smolagents (Thought -> Action -> Observation)."
+        "description": "Dynamic reasoning agent execution loop using LangChain and LangGraph ReAct (Thought -> Action -> Observation)."
     },
     {
         "id": "code_python",

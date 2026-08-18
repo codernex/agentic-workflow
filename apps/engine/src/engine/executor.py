@@ -11,7 +11,7 @@ from models.execution import WorkflowRun, StepLog, ExecutionStatus
 from models.workflow import Workflow
 from engine.graph import WorkflowGraph
 from engine.broadcaster import broadcaster
-from engine.agent import run_smolagent, HttpRequestTool, StepLoggerTool, EmailAlertTool
+from engine.agent import run_agent, run_smolagent, HttpRequestTool, StepLoggerTool, EmailAlertTool, PythonSandboxTool
 
 from engine.sandbox import execute_sandbox_python
 
@@ -72,6 +72,15 @@ class WorkflowExecutor:
                 tool = EmailAlertTool(
                     name=tool_name,
                     description=desc
+                )
+                connected_tools.append(tool)
+
+            elif n_type == "code":
+                code_snippet = n_data.get("code", "output = inputs")
+                tool = PythonSandboxTool(
+                    name=tool_name,
+                    description=tool_desc,
+                    code_snippet=code_snippet
                 )
                 connected_tools.append(tool)
 
@@ -281,7 +290,7 @@ class WorkflowExecutor:
                 tool_names = ", ".join(t.name for t in dynamic_tools)
                 formatted_prompt += f"\n\nAvailable Tools Connected to You:\n{tool_names}\nYou can invoke these tools during your reasoning loop to obtain observations and perform actions."
 
-            agent_result = await run_smolagent(prompt=formatted_prompt, tools=dynamic_tools)
+            agent_result = await run_agent(prompt=formatted_prompt, tools=dynamic_tools)
             return agent_result.output, agent_result.thought_trace
 
         elif node_type == "code":

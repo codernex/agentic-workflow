@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     OPENROUTER_MODEL: str = "openai/gpt-4o"
     SUPERMEMORY_API_KEY: str = ""
 
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "deepseek-ai/deepseek-v4-pro"
+    OPENAI_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+
     @field_validator("DATABASE_URL", mode="after")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
