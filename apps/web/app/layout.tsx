@@ -12,20 +12,20 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 export const metadata: Metadata = {
   title: "Agentic Workflow Automation Engine | AI Agents & Python Sandboxes",
   description:
-    "Design event-driven DAG visual graphs with Hugging Face smolagents reasoning loops, isolated process Python execution, and Mailtrap email verification.",
+    "Design event-driven DAG visual graphs with LangChain & LangGraph reasoning loops, isolated process Python execution, and Mailtrap email verification.",
   keywords: [
     "AI Agent Automation",
-    "Hugging Face smolagents",
+    "LangChain & LangGraph",
     "Python Sandbox Execution",
     "Visual DAG Workflow Editor",
     "Event-Driven Webhook Engine",
-    "OpenRouter CodeAgent",
+    "LangGraph ReAct Agent",
   ],
   authors: [{ name: "Agentic Workflow Team" }],
   openGraph: {
     title: "Agentic Workflow Automation Engine",
     description:
-      "Autonomous AI agent execution engine powered by Hugging Face smolagents, isolated Python process sandboxing, and real-time DAG visual canvas editor.",
+      "Autonomous AI agent execution engine powered by LangChain & LangGraph, isolated Python process sandboxing, and real-time DAG visual canvas editor.",
     type: "website",
     locale: "en_US",
     siteName: "Agentic Workflow",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Agentic Workflow Automation Engine",
     description:
-      "Autonomous AI agent execution engine powered by Hugging Face smolagents and isolated Python sandboxes.",
+      "Autonomous AI agent execution engine powered by LangChain & LangGraph and isolated Python sandboxes.",
   },
   robots: {
     index: true,

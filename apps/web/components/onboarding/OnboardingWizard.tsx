@@ -17,13 +17,13 @@ export function OnboardingWizard({ isOpen, onOpenChange }: OnboardingWizardProps
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [workspaceName, setWorkspaceName] = useState("My Agentic Studio");
-  const [selectedGoal, setSelectedGoal] = useState<string>("smolagent");
+  const [selectedGoal, setSelectedGoal] = useState<string>("langchain_langgraph");
 
   const goals = [
     {
-      id: "smolagent",
-      title: "Hugging Face smolagents AI",
-      desc: "Autonomous CodeAgent reasoning with OpenRouter & OpenAI models",
+      id: "langchain_langgraph",
+      title: "LangChain & LangGraph AI Agent",
+      desc: "Autonomous ReAct agent reasoning with LangGraph & LangChain models",
       icon: Bot,
       color: "border-purple-500/40 bg-purple-950/20 text-purple-300",
     },
@@ -142,7 +142,7 @@ export function OnboardingWizard({ isOpen, onOpenChange }: OnboardingWizardProps
               </Badge>
               <h3 className="text-lg font-bold text-foreground">{workspaceName} Initialized</h3>
               <p className="text-xs text-muted-foreground">
-                Your workspace is configured with Hugging Face <code className="text-purple-400 font-mono">smolagents</code> reasoning loops, isolated Python execution sandboxing, and Mailtrap email verification.
+                Your workspace is configured with <code className="text-purple-400 font-mono">LangChain & LangGraph</code> reasoning loops, isolated Python execution sandboxing, and Mailtrap email verification.
               </p>
             </div>
             <Button

@@ -115,7 +115,7 @@ export default function WorkflowsPage() {
         is_active: true,
         nodes: [
           { id: "node-1", type: "customNode", position: { x: 250, y: 100 }, data: { label: "Trigger Node", type: "trigger" } },
-          { id: "node-2", type: "customNode", position: { x: 250, y: 300 }, data: { label: "smolagent AI", type: "agent", prompt: "Execute agentic reasoning task." } }
+          { id: "node-2", type: "customNode", position: { x: 250, y: 300 }, data: { label: "LangGraph AI Agent", type: "agent", prompt: "Execute agentic reasoning task." } }
         ],
         edges: [
           { id: "edge-1-2", source: "node-1", target: "node-2", animated: true, style: { stroke: "#8b5cf6", strokeWidth: 2 } }

@@ -139,7 +139,7 @@ function LoginFormContent() {
           </CardTitle>
           <CardDescription className="text-xs text-muted-foreground">
             {mode === "login" && "Sign in to manage visual agentic workflows & executions."}
-            {mode === "register" && "Get started with smolagents AI workflow automation engine."}
+            {mode === "register" && "Get started with LangChain & LangGraph AI workflow automation engine."}
             {mode === "verify" && `Enter the 6-digit code sent via Mailtrap to ${email || "your email"}.`}
           </CardDescription>
         </CardHeader>

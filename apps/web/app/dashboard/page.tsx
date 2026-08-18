@@ -127,7 +127,7 @@ export default function UserDashboardPage() {
               Welcome Back, {user?.full_name || "Automation Engineer"} 👋
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Your personal workspace for executing visual DAG agent workflows, smolagent reasoning loops, and isolated Python sandboxes.
+              Your personal workspace for executing visual DAG agent workflows, LangGraph reasoning loops, and isolated Python sandboxes.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -191,8 +191,8 @@ export default function UserDashboardPage() {
             <Bot className="h-4 w-4 text-amber-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-extrabold text-foreground">smolagents</div>
-            <p className="text-xs text-muted-foreground mt-1 font-mono text-[11px]">CodeAgent + OpenRouter</p>
+            <div className="text-2xl font-extrabold text-foreground">LangGraph</div>
+            <p className="text-xs text-muted-foreground mt-1 font-mono text-[11px]">ReAct + LangChain</p>
           </CardContent>
         </Card>
       </div>

@@ -33,7 +33,7 @@ const nodeTypeConfig: Record<string, { label: string; icon: any; color: string; 
     borderClass: "border-purple-500/40 hover:border-purple-500",
   },
   agent: {
-    label: "smolagent AI",
+    label: "LangGraph AI Agent",
     icon: Bot,
     color: "#f472b6",
     bgClass: "bg-pink-950/40",
@@ -99,9 +99,9 @@ const nodeTypeConfig: Record<string, { label: string; icon: any; color: string; 
 
 export type NodeType = CustomNodeData["type"];
 // Special node types that sit on left and connect via right handle
-export const SPECIAL_LEFT_NODE_TYPES: NodeType[] = ["http_request", "logger", "email"];
+export const SPECIAL_LEFT_NODE_TYPES: NodeType[] = ["http_request", "logger", "email", "code"];
 // Special node types that sit on right and accept connections via left handle
-export const SPECIAL_RIGHT_NODE_TYPES: NodeType[] = ["agent_custom"];
+export const SPECIAL_RIGHT_NODE_TYPES: NodeType[] = ["agent", "agent_custom"];
 
 export const CustomCanvasNode = memo(({ id, data, selected }: NodeProps) => {
   const nodeData = data as unknown as CustomNodeData;

@@ -1,7 +1,7 @@
 # Agentic Workflow Automation Engine 🚀
 
 > **Next-Gen Event-Driven AI Agent DAG Execution Platform**  
-> Powered by Hugging Face `smolagents`, Isolated Python Subprocess Sandboxing, Mailtrap Email Verification, and Real-Time WebSocket Execution Streaming.
+> Powered by **LangChain & LangGraph**, Isolated Python Subprocess Sandboxing, Mailtrap Email Verification, and Real-Time WebSocket Execution Streaming.
 
 ---
 
@@ -14,7 +14,7 @@ The **Agentic Workflow Automation Engine** is a modern, full-stack monorepo plat
 ## ✨ Key Features
 
 - 🎨 **Visual DAG Canvas Studio**: Interactive node-based graph editor built with ReactFlow, featuring a collapsible nodes collection sidebar, 1-click custom tool builder, and live thought trace execution drawers.
-- 🤖 **Hugging Face `smolagents` Reasoning**: Autonomous `CodeAgent` execution powered by OpenRouter / OpenAI models with dynamic template interpolation (e.g. `{node-1.data}`, `{source}`).
+- 🤖 **LangChain & LangGraph Reasoning**: Autonomous ReAct agent execution powered by LangGraph, `create_react_agent`, and Chat model endpoints with dynamic template interpolation.
 - 🔒 **Isolated Python Subprocess Sandbox**: Executes custom Python code snippets inside separate `multiprocessing.Process` workers with a restricted builtins whitelist and strict **5.0s execution timeout** limits.
 - 🔀 **Selective Data Forwarding**: Per-node field projection control (`all` or `selected_keys`) allowing users to choose exact payload keys passed to downstream nodes.
 - 📧 **User Authentication & Mailtrap Verification**: 6-digit email verification code delivery powered by the **Official Mailtrap Python SDK** with elegant responsive HTML email templates, JWT security, and a resend code facility.
@@ -37,7 +37,7 @@ The **Agentic Workflow Automation Engine** is a modern, full-stack monorepo plat
 - **Framework**: FastAPI (Python 3.14)
 - **Database & ORM**: PostgreSQL via SQLModel & AsyncPG
 - **Migrations**: Alembic
-- **AI Agent Framework**: Hugging Face `smolagents` (`CodeAgent`, `OpenAIServerModel`)
+- **AI Agent Framework**: LangChain & LangGraph (`create_react_agent`, `ChatNVIDIA` / `ChatOpenAI`)
 - **Email Delivery**: Official `mailtrap` Python SDK
 - **Security**: Direct `bcrypt` password hashing, `python-jose` JWT tokens
 

@@ -34,7 +34,7 @@ export function Navbar() {
                 Agentic Workflow
               </span>
               <span className="text-[11px] text-muted-foreground font-mono leading-tight flex items-center gap-1 mt-0.5">
-                <Sparkles className="h-3 w-3 text-purple-400" /> smolagents engine
+                <Sparkles className="h-3 w-3 text-purple-400" /> LangGraph engine
               </span>
             </div>
           </Link>

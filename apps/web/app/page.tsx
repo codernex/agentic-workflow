@@ -56,7 +56,7 @@ export default function LandingPage() {
               priceCurrency: "USD",
             },
             description:
-              "Autonomous AI agent execution engine powered by Hugging Face smolagents, isolated Python process sandboxing, and real-time DAG execution visual editor.",
+              "Autonomous AI agent execution engine powered by LangChain & LangGraph, isolated Python process sandboxing, and real-time DAG execution visual editor.",
           }),
         }}
       />
@@ -68,7 +68,7 @@ export default function LandingPage() {
 
         <div className="container mx-auto px-6 max-w-6xl text-center relative z-10 space-y-8">
           <Badge variant="outline" className="gap-2 px-4 py-1.5 bg-purple-500/10 text-purple-300 border-purple-500/30 text-xs rounded-full font-mono">
-            <Sparkles className="h-3.5 w-3.5 text-purple-400" /> Powered by Hugging Face smolagents & Isolated Python Sandboxes
+            <Sparkles className="h-3.5 w-3.5 text-purple-400" /> Powered by LangChain & LangGraph & Isolated Python Sandboxes
           </Badge>
 
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight sm:leading-none max-w-4xl mx-auto bg-gradient-to-r from-foreground via-foreground/90 to-purple-400 bg-clip-text">
@@ -76,7 +76,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Design event-driven DAG visual graphs with <code className="text-purple-400 font-mono">smolagents</code> reasoning loops, isolated process Python execution, and Mailtrap email verification.
+            Design event-driven DAG visual graphs with <code className="text-purple-400 font-mono">LangChain & LangGraph</code> reasoning loops, isolated process Python execution, and Mailtrap email verification.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -107,13 +107,13 @@ export default function LandingPage() {
         <div className="container mx-auto px-6 max-w-6xl space-y-8">
           <div className="text-center space-y-2">
             <h2 className="text-3xl font-bold tracking-tight">Interactive Visual DAG Execution Engine</h2>
-            <p className="text-sm text-muted-foreground">Click any node below to inspect real-time data passing and smolagent reasoning output.</p>
+            <p className="text-sm text-muted-foreground">Click any node below to inspect real-time data passing and agent reasoning output.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {[
               { id: "trigger", title: "Manual / Webhook Trigger", icon: Zap, type: "Trigger Node", color: "purple" },
-              { id: "agent", title: "smolagents AI Agent", icon: Bot, type: "Reasoning Node", color: "pink" },
+              { id: "agent", title: "LangGraph AI Agent", icon: Bot, type: "Reasoning Node", color: "pink" },
               { id: "sandbox", title: "Python Process Sandbox", icon: Code, type: "Isolated Execution", color: "blue" },
               { id: "alert", title: "Mailtrap Email Alert", icon: Mail, type: "Integration Node", color: "emerald" },
             ].map((node) => {
@@ -170,9 +170,9 @@ export default function LandingPage() {
                 <div className="h-10 w-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
                   <Bot className="h-5 w-5" />
                 </div>
-                <CardTitle className="text-lg">Hugging Face smolagents</CardTitle>
+                <CardTitle className="text-lg">LangChain & LangGraph</CardTitle>
                 <CardDescription className="text-xs leading-relaxed">
-                  Utilizes <code className="text-purple-400 font-mono">CodeAgent</code> with OpenRouter models to plan, execute python tools, and solve complex multi-step tasks.
+                  Utilizes <code className="text-purple-400 font-mono">create_react_agent</code> with LangChain models to plan, execute python tools, and solve complex multi-step tasks.
                 </CardDescription>
               </CardHeader>
             </Card>

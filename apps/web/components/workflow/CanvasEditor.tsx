@@ -338,12 +338,60 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
     {
       category: "AI Reasoning Agents",
       items: [
-        { type: "agent", label: "smolagent Code Agent", prompt: "Analyze inputs and execute decision logic.", desc: "Dynamic Thought -> Action loop.", icon: Bot, color: "text-pink-400" },
+        { type: "agent", label: "LangGraph ReAct Agent", prompt: "Analyze inputs and execute decision logic.", desc: "Dynamic Thought -> Action loop.", icon: Bot, color: "text-pink-400" },
         { type: "agent", label: "Content Summarizer", prompt: "Summarize upstream input data into executive bullet points.", desc: "Extracts key insights from text.", icon: Bot, color: "text-pink-400" },
         { type: "agent", label: "Lead Scoring Agent", prompt: "Analyze user lead payload and score priority (1-100).", desc: "Scores and classifies incoming leads.", icon: Bot, color: "text-pink-400" },
         {
           type: "agent_custom", label: "Custom Agent", prompt: "You can expect you will get order data from previous node, you will have to process the order data and validate the order details, if the order is valid then generate a confirmation message and if the order is invalid then generate a rejection message and email to the customer about the order status based on the order details.", desc: "Custom agent with ability to think and act based on the input data", icon: Bot, color: "text-pink-400"
         }
+      ],
+    },
+    {
+      category: "Agent Tools (Supported by Custom Agent)",
+      items: [
+        {
+          type: "http_request",
+          isTool: true,
+          label: "HTTP Request Tool",
+          tool_name: "http_request_tool",
+          tool_description: "Executes HTTP REST API calls and returns status code and response body.",
+          url: "https://api.github.com/zen",
+          method: "GET",
+          desc: "Connect to custom agent to perform HTTP REST API calls.",
+          icon: Globe,
+          color: "text-emerald-400"
+        },
+        {
+          type: "email",
+          isTool: true,
+          label: "Email Alert Tool",
+          tool_name: "email_alert_tool",
+          tool_description: "Dispatches validated email notifications to target recipients.",
+          desc: "Connect to custom agent to dispatch email alerts.",
+          icon: Mail,
+          color: "text-rose-400"
+        },
+        {
+          type: "code",
+          isTool: true,
+          label: "Python Sandbox Tool",
+          tool_name: "python_sandbox_tool",
+          tool_description: "Executes custom Python code in isolated process sandbox.",
+          code: "output = inputs",
+          desc: "Connect to custom agent to run Python sandbox logic.",
+          icon: Code,
+          color: "text-blue-400"
+        },
+        {
+          type: "logger",
+          isTool: true,
+          label: "Step Logger Tool",
+          tool_name: "step_logger_tool",
+          tool_description: "Logs step observations and execution traces for debugging.",
+          desc: "Connect to custom agent to log observations.",
+          icon: Terminal,
+          color: "text-teal-400"
+        },
       ],
     },
     {
@@ -396,6 +444,12 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
         tool_description: "Dispatches email alerts to designated recipient addresses",
         input_schema: "recipient, subject, message_body",
         output_schema: "delivery_status, timestamp",
+      },
+      code: {
+        tool_name: "python_sandbox_tool",
+        tool_description: "Executes custom Python code in isolated process sandbox",
+        input_schema: "script_input",
+        output_schema: "sandbox_output, execution_logs",
       },
     };
 
@@ -492,7 +546,7 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
   };
 
   // Add Node Handler
-  const handleAddNode = (type: string, label: string) => {
+  const handleAddNode = (type: string, label: string, extraData?: Record<string, any>) => {
     const newNode: Node = {
       id: `node-${Date.now()}`,
       type: "customNode",
@@ -501,10 +555,11 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
         label,
         type,
         prompt: type === "agent" ? "Analyze inputs and execute decision logic." : undefined,
-        code: type === "code" ? "log('Accessing previous steps...')\noutput = {'result': steps}\n" : undefined,
-        url: type === "http_request" ? "https://api.github.com/zen" : undefined,
+        code: type === "code" ? (extraData?.code || "log('Accessing previous steps...')\noutput = {'result': steps}\n") : undefined,
+        url: type === "http_request" ? (extraData?.url || "https://api.github.com/zen") : undefined,
         hasLeftTarget: false,
         hasRightTarget: true,
+        ...extraData,
       },
     };
     setNodes((nds) => [...nds, newNode]);
@@ -558,7 +613,7 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
     if (!selectedNode) return;
     const defaultLabels: Record<string, string> = {
       trigger: "Event Trigger",
-      agent: "smolagent AI",
+      agent: "LangGraph AI Agent",
       code: "Python Code",
       logger: "Step Logger",
       http_request: "HTTP Request",
@@ -833,7 +888,7 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
                       return (
                         <div
                           key={iIdx}
-                          onClick={() => handleAddNode(item.type, item.label)}
+                          onClick={() => handleAddNode(item.type, item.label, item)}
                           className="group p-3 rounded-xl border border-border/40 hover:border-purple-500/50 bg-card/40 hover:bg-purple-500/10 cursor-pointer transition-all flex items-start gap-3 shadow-sm"
                         >
                           <div className={`p-2 rounded-lg bg-secondary/80 mt-0.5 shrink-0 ${item.color}`}>
@@ -849,6 +904,11 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
                             <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
                               {item.desc}
                             </p>
+                            {item.isTool && (
+                              <Badge variant="outline" className="text-[9px] uppercase font-mono mt-1.5 text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                                🛠️ Agent Tool
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       );
@@ -927,7 +987,7 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => handleAddNode("agent", "smolagent AI")}
+              onClick={() => handleAddNode("agent", "LangGraph AI Agent")}
               className="gap-1.5 text-xs hover:bg-pink-500/10 hover:text-pink-400"
             >
               <Bot className="h-3.5 w-3.5 text-pink-400" /> + AI Agent
@@ -1064,7 +1124,7 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="trigger">⚡ Trigger Event</SelectItem>
-                      <SelectItem value="agent">🤖 smolagent AI Agent</SelectItem>
+                      <SelectItem value="agent">🤖 LangGraph AI Agent</SelectItem>
                       <SelectItem value="code">🐍 Python Code Block</SelectItem>
                       <SelectItem value="logger">📋 Step Result Logger</SelectItem>
                       <SelectItem value="condition">🔀 Conditional Router</SelectItem>
@@ -1223,38 +1283,55 @@ export function CanvasEditor({ workflowId, initialNodes = [], initialEdges = [],
                       />
                     </div>
 
-                    <div className="p-3 rounded-xl border border-purple-500/20 bg-purple-950/20 text-xs space-y-1.5 text-purple-200">
-                      <p className="font-semibold text-purple-300 flex items-center gap-1.5 text-[11px]">
-                        <Sparkles className="h-3.5 w-3.5 text-purple-400" /> User Prompt & Dynamic Variables:
-                      </p>
+                    <div className="p-3 rounded-xl border border-purple-500/20 bg-purple-950/20 text-xs space-y-2 text-purple-200">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-purple-300 flex items-center gap-1.5 text-[11px]">
+                          <Wrench className="h-3.5 w-3.5 text-purple-400" /> Agent Tools & ReAct Calling
+                        </p>
+                        <Badge variant="outline" className="text-[9px] font-mono text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                          python_sandbox_tool Supported
+                        </Badge>
+                      </div>
                       <p className="text-[11px] text-muted-foreground leading-relaxed font-sans">
-                        Pass user prompts or trigger payload data into your agent dynamically using placeholders like <code className="text-purple-300 font-mono font-bold">{"{{user_prompt}}"}</code>, <code className="text-purple-300 font-mono font-bold">{"{{order_id}}"}</code>, or <code className="text-purple-300 font-mono font-bold">{"{{input}}"}</code>.
+                        Connect any supported tool nodes (<code className="text-emerald-400 font-mono font-bold">python_sandbox_tool</code>, <code className="text-emerald-400 font-mono font-bold">http_request_tool</code>, <code className="text-emerald-400 font-mono font-bold">email_alert_tool</code>, <code className="text-emerald-400 font-mono font-bold">step_logger_tool</code>) to this agent's tool handle to enable autonomous LLM tool execution.
                       </p>
                     </div>
                   </div>
                 )}
 
                 {selectedNode.data.type === "code" && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label>Python Execution Code</Label>
-                      <span className="text-[10px] text-muted-foreground font-mono">Isolated Sandbox</span>
+                      <Label className="text-xs font-semibold flex items-center gap-1.5">
+                        <Code className="h-4 w-4 text-blue-400" /> Python Execution Code
+                      </Label>
+                      <Badge variant="outline" className="text-[10px] font-mono text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                        {selectedNode.data.isTool ? "🛠️ Active Tool: python_sandbox_tool" : "Isolated Sandbox"}
+                      </Badge>
                     </div>
                     <textarea
                       rows={8}
-                      className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-sm shadow-sm font-mono text-emerald-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      className="w-full rounded-md border border-input bg-black/40 px-3 py-2 text-xs shadow-sm font-mono text-emerald-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       value={(selectedNode.data.code as string) || ""}
                       onChange={(e) => updateSelectedNodeData("code", e.target.value)}
                       placeholder="log('msg')&#10;output = {'result': steps['node-1']}"
                     />
-                    <div className="rounded-lg border border-blue-500/20 bg-blue-950/20 p-3 text-[11px] text-muted-foreground space-y-1.5">
-                      <p className="text-blue-300 font-semibold flex items-center gap-1.5">
-                        <Code className="h-3.5 w-3.5" /> Sandbox Execution Environment:
+                    <div className="rounded-xl border border-blue-500/20 bg-blue-950/20 p-3 text-[11px] text-muted-foreground space-y-2">
+                      <div className="flex items-center justify-between text-blue-300 font-semibold">
+                        <span className="flex items-center gap-1.5 text-[11px]">
+                          <Code className="h-3.5 w-3.5 text-blue-400" /> Sandbox & Agent Tool Support:
+                        </span>
+                        <Badge variant="outline" className="text-[9px] font-mono text-emerald-400 border-emerald-500/30">
+                          python_sandbox_tool
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Executes in an isolated process sandbox. When connected to a Custom Agent, it acts as <code className="text-emerald-400 font-mono font-bold">python_sandbox_tool</code> for dynamic agent tool-calling.
                       </p>
-                      <ul className="list-disc list-inside space-y-1 font-mono text-[11px]">
-                        <li><code className="text-emerald-400 font-bold">log("msg", val)</code> or <code className="text-emerald-400 font-bold">print(...)</code> — write to execution log trace</li>
-                        <li><code className="text-emerald-400 font-bold">steps['node_id']</code> — read data output from any previous node call</li>
-                        <li><code className="text-emerald-400 font-bold">output = ...</code> — return data payload for child nodes</li>
+                      <ul className="list-disc list-inside space-y-1 font-mono text-[10px] text-blue-200">
+                        <li><code className="text-emerald-400 font-bold">log("msg", val)</code> — Write to log trace</li>
+                        <li><code className="text-emerald-400 font-bold">steps['node_id']</code> — Read output from previous steps</li>
+                        <li><code className="text-emerald-400 font-bold">output = ...</code> — Return payload to child nodes or agent</li>
                       </ul>
                     </div>
                   </div>
