@@ -114,6 +114,21 @@ def _sandbox_worker(code_snippet: str, inputs: Dict[str, Any], steps: Dict[str, 
             if clean_id.isidentifier() and clean_id not in safe_globals:
                 safe_globals[clean_id] = s_val
 
+    # AST Security Guardrail Inspection
+    import ast
+    try:
+        tree = ast.parse(code_snippet)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                raise PermissionError("Security Violation: Import statements ('import', 'from ... import') are blocked in the Python sandbox.")
+            if isinstance(node, ast.Attribute) and node.attr.startswith("__"):
+                raise PermissionError(f"Security Violation: Access to dunder attribute '{node.attr}' is restricted by sandbox guardrails.")
+    except Exception as ast_err:
+        return_dict['logs'] = execution_logs
+        return_dict['error'] = f"Sandbox AST Security Error: {ast_err}"
+        return_dict['success'] = False
+        return
+
     local_scope = {'output': None, 'result': None}
 
     try:
